@@ -44,7 +44,9 @@ export default function TodoWindow() {
     const handleWheel = (e) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        // Normalize deltaY: mouse wheel typically gives ±100/120, trackpad gives smaller values
+        const raw = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
+        const delta = -(raw / 2000);
         const newScale = Math.max(0.3, Math.min(2.5, scaleRef.current + delta));
         scaleRef.current = newScale;
         setScale(newScale);
