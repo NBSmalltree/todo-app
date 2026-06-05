@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   archiveTodo: (id) => ipcRenderer.invoke('db:archiveTodo', id),
   getArchived: (filters) => ipcRenderer.invoke('db:getArchived', filters),
   updateNote: (id, note) => ipcRenderer.invoke('db:updateNote', id, note),
+  updateCategory: (id, category) => ipcRenderer.invoke('db:updateCategory', id, category),
   getCategories: () => ipcRenderer.invoke('db:getCategories'),
   getWorkAnalysis: (period) => ipcRenderer.invoke('db:getWorkAnalysis', period),
   getSettings: () => ipcRenderer.invoke('db:getSettings'),

@@ -89,8 +89,7 @@ export default function ArchiveViewer() {
     try {
       const category = await electronAPI.categorize(item.text);
       if (category) {
-        // Update the item's category in the database
-        // We need to add a method for this, for now we'll reload
+        await electronAPI.updateCategory(item.id, category);
         await loadArchives();
         await loadCategories();
       }
@@ -260,15 +259,13 @@ export default function ArchiveViewer() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        {!item.category && (
-                          <button
-                            onClick={() => handleCategorize(item)}
-                            className="px-2 py-1 text-xs text-sky-600 bg-sky-50 rounded hover:bg-sky-100 transition-colors"
-                            title="使用AI自动分类"
-                          >
-                            AI分类
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleCategorize(item)}
+                          className="px-2 py-1 text-xs text-sky-600 bg-sky-50 rounded hover:bg-sky-100 transition-colors"
+                          title="使用AI自动分类"
+                        >
+                          {item.category ? '重新分类' : 'AI分类'}
+                        </button>
                       </div>
                     </td>
                   </tr>

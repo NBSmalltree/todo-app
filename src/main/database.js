@@ -118,6 +118,11 @@ class TodoDatabase {
     return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
   }
 
+  updateCategory(id, category) {
+    this.db.prepare('UPDATE todos SET category = ? WHERE id = ?').run(category, id);
+    return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+  }
+
   getCategories() {
     return this.db
       .prepare('SELECT DISTINCT category FROM todos WHERE archived = 1 AND category IS NOT NULL')

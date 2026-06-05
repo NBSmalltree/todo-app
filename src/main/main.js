@@ -369,6 +369,7 @@ function setupIPC() {
   ipcMain.handle('db:archiveTodo', (e, id) => db.archiveTodo(id));
   ipcMain.handle('db:getArchived', (e, filters) => db.getArchived(filters));
   ipcMain.handle('db:updateNote', (e, id, note) => db.updateNote(id, note));
+  ipcMain.handle('db:updateCategory', (e, id, category) => db.updateCategory(id, category));
   ipcMain.handle('db:getCategories', () => db.getCategories());
   ipcMain.handle('db:getWorkAnalysis', (e, period) => db.getWorkAnalysis(period));
   ipcMain.handle('db:getSettings', () => db.getSettings());

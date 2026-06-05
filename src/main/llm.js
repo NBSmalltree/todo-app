@@ -2,37 +2,45 @@ const OpenAI = require('openai');
 
 class LLMHelper {
   constructor(settings = {}) {
+    const baseURL = (settings.base_url || 'https://api.openai.com/v1').replace(/\/+$/, '');
     this.client = new OpenAI({
       apiKey: settings.api_key || '',
-      baseURL: settings.base_url || 'https://api.openai.com/v1',
+      baseURL,
     });
     this.model = settings.model || 'gpt-4o-mini';
   }
 
   async categorize(text) {
-    try {
-      const response = await this.client.chat.completions.create({
-        model: this.model,
-        messages: [
-          {
-            role: 'system',
-            content: `你是一个工作分类助手。请根据用户的工作任务描述，判断其所属的工作类别。
+    const messages = [
+      {
+        role: 'system',
+        content: `你是一个工作分类助手。请根据用户的工作任务描述，判断其所属的工作类别。
 只返回一个类别名称，不要返回其他内容。
 常见的工作类别包括：开发、设计、测试、文档、会议、沟通、运维、学习、管理、其他。
 如果没有明确的类别，返回"其他"。`,
-          },
-          {
-            role: 'user',
-            content: `请判断以下工作任务的类别：${text}`,
-          },
-        ],
-        max_tokens: 20,
+      },
+      {
+        role: 'user',
+        content: `请判断以下工作任务的类别：${text}`,
+      },
+    ];
+
+    console.log('[LLM] Request:', JSON.stringify({ baseURL: this.client.baseURL, model: this.model, text }, null, 2));
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages,
+        max_tokens: 10000,
         temperature: 0.1,
       });
 
-      return response.choices[0]?.message?.content?.trim() || '其他';
+      const result = response.choices[0]?.message?.content?.trim() || '其他';
+      console.log('[LLM] Response:', JSON.stringify(response.choices?.[0], null, 2));
+      return result;
     } catch (error) {
-      console.error('LLM categorization error:', error.message);
+      console.error('[LLM] Error:', error.status, error.message);
+      if (error.error) console.error('[LLM] Error detail:', JSON.stringify(error.error));
       return '其他';
     }
   }
