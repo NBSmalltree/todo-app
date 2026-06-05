@@ -21,11 +21,26 @@ function isDev() {
 }
 
 function createFloatWindow() {
+  // Read saved window bounds, fallback to defaults
+  let bounds = { x: 100, y: 100, width: BASE_WIDTH, height: BASE_HEIGHT };
+  try {
+    const settings = db.getSettings();
+    if (settings.window_bounds) {
+      const saved = typeof settings.window_bounds === 'string'
+        ? JSON.parse(settings.window_bounds)
+        : settings.window_bounds;
+      bounds = { ...bounds, ...saved };
+    }
+  } catch (e) { /* use defaults */ }
+
+  // Initialize scale from saved size
+  windowScale = Math.round((bounds.width / BASE_WIDTH + bounds.height / BASE_HEIGHT) / 2 * 10) / 10;
+
   floatWindow = new BrowserWindow({
-    width: BASE_WIDTH,
-    height: BASE_HEIGHT,
-    x: 100,
-    y: 100,
+    width: bounds.width,
+    height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -452,5 +467,13 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   app.isQuitting = true;
+  // Save window bounds
+  if (floatWindow && !floatWindow.isDestroyed()) {
+    try {
+      const [width, height] = floatWindow.getSize();
+      const [x, y] = floatWindow.getPosition();
+      db.saveSettings({ window_bounds: JSON.stringify({ x, y, width, height }) });
+    } catch (e) { /* ignore */ }
+  }
   if (db) db.close();
 });
