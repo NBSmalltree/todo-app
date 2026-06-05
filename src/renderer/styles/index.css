@@ -73,11 +73,61 @@ input, textarea {
 
 /* Todo item hover effects */
 .todo-item {
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .todo-item:hover {
   background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Todo item enter animation */
+@keyframes todoEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.todo-enter {
+  animation: todoEnter 0.25s ease-out;
+}
+
+/* Checkbox pulse on toggle */
+@keyframes checkPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+.todo-check-animate {
+  animation: checkPulse 0.25s ease-out;
+}
+
+/* Delete animation */
+@keyframes todoDelete {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 50px;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(30px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+}
+
+.todo-exit {
+  animation: todoDelete 0.2s ease-in forwards;
+  pointer-events: none;
 }
 
 /* Window drag region */

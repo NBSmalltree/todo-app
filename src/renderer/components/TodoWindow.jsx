@@ -9,6 +9,9 @@ export default function TodoWindow() {
   const [scale, setScale] = useState(1);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeStart, setResizeStart] = useState(null);
+  const [newIds, setNewIds] = useState(new Set());
+  const [exitingIds, setExitingIds] = useState(new Set());
+  const [checkPulseIds, setCheckPulseIds] = useState(new Set());
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const isComposingRef = useRef(false); // Track IME composition state
@@ -77,9 +80,20 @@ export default function TodoWindow() {
   const handleAddTodo = async () => {
     if (!inputText.trim()) return;
     try {
-      await electronAPI.addTodo(inputText.trim());
+      const result = await electronAPI.addTodo(inputText.trim());
       setInputText('');
       await loadTodos();
+      // Mark the new item for enter animation
+      if (result && result.id) {
+        setNewIds((prev) => new Set(prev).add(result.id));
+        setTimeout(() => {
+          setNewIds((prev) => {
+            const next = new Set(prev);
+            next.delete(result.id);
+            return next;
+          });
+        }, 300);
+      }
       inputRef.current?.focus();
     } catch (error) {
       console.error('Failed to add todo:', error);
@@ -88,6 +102,15 @@ export default function TodoWindow() {
 
   const handleToggle = async (id) => {
     try {
+      // Trigger checkbox pulse
+      setCheckPulseIds((prev) => new Set(prev).add(id));
+      setTimeout(() => {
+        setCheckPulseIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 300);
       await electronAPI.toggleTodo(id);
       await loadTodos();
     } catch (error) {
@@ -97,6 +120,14 @@ export default function TodoWindow() {
 
   const handleRestore = async (id) => {
     try {
+      setCheckPulseIds((prev) => new Set(prev).add(id));
+      setTimeout(() => {
+        setCheckPulseIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 300);
       await electronAPI.restoreTodo(id);
       await loadTodos();
     } catch (error) {
@@ -106,7 +137,15 @@ export default function TodoWindow() {
 
   const handleDelete = async (id) => {
     try {
+      // Play exit animation first
+      setExitingIds((prev) => new Set(prev).add(id));
+      await new Promise((r) => setTimeout(r, 200));
       await electronAPI.deleteTodo(id);
+      setExitingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       await loadTodos();
     } catch (error) {
       console.error('Failed to delete todo:', error);
@@ -192,10 +231,8 @@ export default function TodoWindow() {
   const completedTodos = todos.filter((t) => t.completed);
 
   return (
-    <div
-      className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100"
-      style={{ zoom: scale }}
-    >
+    <div className="h-full overflow-hidden">
+      <div className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100" style={{ zoom: scale, transition: 'zoom 0.15s ease-out' }}>
       {/* Title Bar - Draggable */}
       <div className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100">
         <div className="flex items-center gap-2">
@@ -257,12 +294,12 @@ export default function TodoWindow() {
         {activeTodos.map((todo) => (
           <div
             key={todo.id}
-            className="todo-item flex items-center gap-2 px-2 py-1.5 rounded-lg group cursor-default"
+            className={`todo-item flex items-center gap-2 px-2 py-1.5 rounded-lg group cursor-default ${newIds.has(todo.id) ? 'todo-enter' : ''} ${exitingIds.has(todo.id) ? 'todo-exit' : ''}`}
             onContextMenu={(e) => handleContextMenu(e, todo)}
           >
             <button
               onClick={() => handleToggle(todo.id)}
-              className="flex-shrink-0 w-5 h-5 rounded-full border-2 border-gray-300 hover:border-sky-400 transition-colors flex items-center justify-center"
+              className={`flex-shrink-0 w-5 h-5 rounded-full border-2 border-gray-300 hover:border-sky-400 transition-colors flex items-center justify-center ${checkPulseIds.has(todo.id) ? 'todo-check-animate' : ''}`}
             >
               {/* Empty circle for uncompleted */}
             </button>
@@ -291,12 +328,12 @@ export default function TodoWindow() {
         {completedTodos.map((todo) => (
           <div
             key={todo.id}
-            className="todo-item flex items-center gap-2 px-2 py-1.5 rounded-lg group cursor-default"
+            className={`todo-item flex items-center gap-2 px-2 py-1.5 rounded-lg group cursor-default ${newIds.has(todo.id) ? 'todo-enter' : ''} ${exitingIds.has(todo.id) ? 'todo-exit' : ''}`}
             onContextMenu={(e) => handleContextMenu(e, todo)}
           >
             <button
               onClick={() => handleRestore(todo.id)}
-              className="flex-shrink-0 w-5 h-5 rounded-full border-2 border-sky-400 bg-sky-400 transition-colors flex items-center justify-center"
+              className={`flex-shrink-0 w-5 h-5 rounded-full border-2 border-sky-400 bg-sky-400 transition-colors flex items-center justify-center ${checkPulseIds.has(todo.id) ? 'todo-check-animate' : ''}`}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
                 <path d="M5 13l4 4L19 7" />
@@ -398,6 +435,7 @@ export default function TodoWindow() {
         className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-40"
         onMouseDown={(e) => handleResizeStart(e, 'se')}
       />
+    </div>
     </div>
   );
 }
