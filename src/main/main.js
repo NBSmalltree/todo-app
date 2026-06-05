@@ -327,18 +327,17 @@ function createTrayIcon(size) {
   }
 }
 
-// Scale helper: resize window while keeping its center position
+// Scale helper: resize window proportionally from its current size, keeping center
 function applyScaleToWindow(oldScale, newScale) {
   if (!floatWindow) return;
-  const newWidth = Math.round(BASE_WIDTH * newScale);
-  const newHeight = Math.round(BASE_HEIGHT * newScale);
+  const [curWidth, curHeight] = floatWindow.getSize();
+  const ratio = newScale / oldScale;
+  const newWidth = Math.round(curWidth * ratio);
+  const newHeight = Math.round(curHeight * ratio);
 
-  // Keep window centered on the same point
   const [winX, winY] = floatWindow.getPosition();
-  const oldWidth = Math.round(BASE_WIDTH * oldScale);
-  const oldHeight = Math.round(BASE_HEIGHT * oldScale);
-  const newX = winX + Math.round((oldWidth - newWidth) / 2);
-  const newY = winY + Math.round((oldHeight - newHeight) / 2);
+  const newX = winX + Math.round((curWidth - newWidth) / 2);
+  const newY = winY + Math.round((curHeight - newHeight) / 2);
 
   floatWindow.setSize(newWidth, newHeight);
   floatWindow.setPosition(newX, newY);
