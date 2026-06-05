@@ -105,21 +105,24 @@ function createTrayWindow() {
   }
 
   trayWindow.on('close', (e) => {
-    e.preventDefault();
-    trayWindow.hide();
+    if (!app.isQuitting) {
+      e.preventDefault();
+      trayWindow.hide();
+    }
   });
 
   return trayWindow;
 }
 
 function createTray() {
-  // Create a simple tray icon
   const iconSize = process.platform === 'darwin' ? 22 : 16;
-  const icon = nativeImage.createEmpty();
-
-  // Use a template image for macOS
   const trayIcon = createTrayIcon(iconSize);
   tray = new Tray(trayIcon);
+
+  // On macOS, mark as template image so it adapts to light/dark menu bar
+  if (process.platform === 'darwin') {
+    trayIcon.setTemplateImage(true);
+  }
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -162,25 +165,119 @@ function createTray() {
 }
 
 function createTrayIcon(size) {
-  // Create a simple SVG-based icon
-  const canvas = `
-    <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="3" width="18" height="18" rx="3" stroke="#0ea5e9" stroke-width="2" fill="none"/>
-      <path d="M8 12l3 3 5-6" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  `;
+  const zlib = require('zlib');
 
-  if (process.platform === 'darwin') {
-    return nativeImage.createFromBuffer(
-      Buffer.from(canvas),
-      { width: size, height: size }
-    ).resize({ width: size, height: size });
+  // Create a checkmark icon as PNG
+  const width = size;
+  const height = size;
+
+  // RGBA pixel data
+  const pixels = Buffer.alloc(width * height * 4, 0);
+
+  const setPixel = (x, y, r, g, b, a) => {
+    if (x < 0 || x >= width || y < 0 || y >= height) return;
+    const idx = (y * width + x) * 4;
+    pixels[idx] = r;
+    pixels[idx + 1] = g;
+    pixels[idx + 2] = b;
+    pixels[idx + 3] = a;
+  };
+
+  // Scale coordinates relative to icon size
+  const s = size / 16;
+  const col = [6, 168, 233]; // sky-500
+
+  // Draw rounded rectangle border
+  const drawRoundRect = (x0, y0, x1, y1, radius) => {
+    for (let x = x0; x <= x1; x++) {
+      for (let y = y0; y <= y1; y++) {
+        const inCorner =
+          (x < x0 + radius && y < y0 + radius && Math.sqrt((x - x0 - radius) ** 2 + (y - y0 - radius) ** 2) > radius) ||
+          (x > x1 - radius && y < y0 + radius && Math.sqrt((x - x1 + radius) ** 2 + (y - y0 - radius) ** 2) > radius) ||
+          (x < x0 + radius && y > y1 - radius && Math.sqrt((x - x0 - radius) ** 2 + (y - y1 + radius) ** 2) > radius) ||
+          (x > x1 - radius && y > y1 - radius && Math.sqrt((x - x1 + radius) ** 2 + (y - y1 + radius) ** 2) > radius);
+        if (inCorner) continue;
+        const onBorder = x === x0 || x === x1 || y === y0 || y === y1;
+        if (onBorder) {
+          setPixel(x, y, ...col, 255);
+        }
+      }
+    }
+  };
+
+  drawRoundRect(Math.round(1 * s), Math.round(1 * s), Math.round(14 * s), Math.round(14 * s), Math.round(2 * s));
+
+  // Draw checkmark
+  const drawLine = (x0, y0, x1, y1) => {
+    const dx = Math.abs(x1 - x0);
+    const dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+    let x = x0, y = y0;
+    while (true) {
+      setPixel(x, y, ...col, 255);
+      if (x === x1 && y === y1) break;
+      const e2 = 2 * err;
+      if (e2 > -dy) { err -= dy; x += sx; }
+      if (e2 < dx) { err += dx; y += sy; }
+    }
+  };
+
+  drawLine(Math.round(4 * s), Math.round(8 * s), Math.round(7 * s), Math.round(11 * s));
+  drawLine(Math.round(7 * s), Math.round(11 * s), Math.round(12 * s), Math.round(4 * s));
+
+  // Build PNG
+  const png = buildPNG(width, height, pixels, zlib);
+  return nativeImage.createFromBuffer(png);
+
+  function buildPNG(w, h, rgba, zlibMod) {
+    const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+    const crc32 = (buf) => {
+      let crc = 0xffffffff;
+      for (let i = 0; i < buf.length; i++) {
+        crc ^= buf[i];
+        for (let j = 0; j < 8; j++) {
+          crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+        }
+      }
+      return (crc ^ 0xffffffff) >>> 0;
+    };
+
+    const chunk = (type, data) => {
+      const len = Buffer.alloc(4);
+      len.writeUInt32BE(data.length);
+      const typeBuffer = Buffer.from(type);
+      const crcData = Buffer.concat([typeBuffer, data]);
+      const crcVal = Buffer.alloc(4);
+      crcVal.writeUInt32BE(crc32(crcData));
+      return Buffer.concat([len, typeBuffer, data, crcVal]);
+    };
+
+    // IHDR
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(w, 0);
+    ihdr.writeUInt32BE(h, 4);
+    ihdr[8] = 8; // bit depth
+    ihdr[9] = 6; // RGBA
+    ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+
+    // IDAT - add filter byte (0) to each row
+    const rawData = Buffer.alloc(h * (1 + w * 4));
+    for (let y = 0; y < h; y++) {
+      rawData[y * (1 + w * 4)] = 0;
+      rgba.copy(rawData, y * (1 + w * 4) + 1, y * w * 4, (y + 1) * w * 4);
+    }
+    const compressed = zlibMod.deflateSync(rawData);
+
+    return Buffer.concat([
+      signature,
+      chunk('IHDR', ihdr),
+      chunk('IDAT', compressed),
+      chunk('IEND', Buffer.alloc(0)),
+    ]);
   }
-
-  return nativeImage.createFromBuffer(
-    Buffer.from(canvas),
-    { width: size, height: size }
-  );
 }
 
 // Scale helper: resize window while keeping its center position

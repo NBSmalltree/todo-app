@@ -4,7 +4,7 @@
   "description": "轻量级桌面待办清单 - 漂浮在所有窗口顶端",
   "main": "src/main/main.js",
   "scripts": {
-    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev": "concurrently --kill-others \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build && electron-builder",
     "build:renderer": "vite build"
   },
