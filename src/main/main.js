@@ -88,11 +88,12 @@ function createTrayWindow() {
     width: Math.min(900, screenWidth - 100),
     height: Math.min(700, screenHeight - 100),
     show: false,
-    frame: true,
+    frame: false,
     title: 'TodoFloat - 历史归档',
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
 
@@ -126,7 +127,7 @@ function createTray() {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: '显示待办窗口',
+      label: '待办清单',
       click: () => {
         if (floatWindow) {
           floatWindow.show();
@@ -135,7 +136,7 @@ function createTray() {
       },
     },
     {
-      label: '历史归档 & 工作分析',
+      label: '历史归档',
       click: () => {
         const win = createTrayWindow();
         win.show();
@@ -157,10 +158,7 @@ function createTray() {
   tray.setContextMenu(contextMenu);
 
   tray.on('click', () => {
-    const win = createTrayWindow();
-    win.show();
-    win.focus();
-    win.webContents.send('navigate', '/tray');
+    tray.popUpContextMenu(contextMenu);
   });
 }
 
@@ -322,13 +320,15 @@ function setupIPC() {
     return await llm.categorize(text);
   });
 
-  // Window control
-  ipcMain.handle('window:close', () => {
-    if (floatWindow) floatWindow.hide();
+  // Window control - works for any calling window
+  ipcMain.handle('window:close', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.hide();
   });
 
-  ipcMain.handle('window:minimize', () => {
-    if (floatWindow) floatWindow.minimize();
+  ipcMain.handle('window:minimize', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.minimize();
   });
 
   ipcMain.handle('window:setScale', (e, newScale) => {
