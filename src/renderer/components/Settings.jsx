@@ -2,12 +2,47 @@ import React, { useState, useEffect } from 'react';
 
 const { electronAPI } = window;
 
+const THEMES = [
+  { id: 'light', label: '浅色模式', icon: 'sun' },
+  { id: 'dark', label: '深色模式', icon: 'moon' },
+  { id: 'eye-care', label: '护眼模式', icon: 'eye' },
+];
+
+function ThemeIcon({ type }) {
+  switch (type) {
+    case 'sun':
+      return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="5" />
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+        </svg>
+      );
+    case 'moon':
+      return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+        </svg>
+      );
+    case 'eye':
+      return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
 export default function Settings() {
   const [settings, setSettings] = useState({
     api_key: '',
     base_url: 'https://api.openai.com/v1',
     model: 'gpt-4o-mini',
   });
+  const [theme, setTheme] = useState('light');
+  const [opacity, setOpacity] = useState(0.92);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -16,12 +51,25 @@ export default function Settings() {
     loadSettings();
   }, []);
 
+  // Apply theme whenever it changes
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    electronAPI?.applyTheme(theme);
+  }, [theme]);
+
+  // Apply opacity whenever it changes
+  useEffect(() => {
+    electronAPI?.setOpacity(opacity);
+  }, [opacity]);
+
   const loadSettings = async () => {
     try {
       const data = await electronAPI.getSettings();
       if (data.api_key) setSettings((prev) => ({ ...prev, api_key: data.api_key }));
       if (data.base_url) setSettings((prev) => ({ ...prev, base_url: data.base_url }));
       if (data.model) setSettings((prev) => ({ ...prev, model: data.model }));
+      if (data.theme) setTheme(data.theme);
+      if (data.todo_opacity != null) setOpacity(Number(data.todo_opacity));
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
@@ -31,7 +79,11 @@ export default function Settings() {
     setIsSaving(true);
     setSaveMessage('');
     try {
-      await electronAPI.saveSettings(settings);
+      await electronAPI.saveSettings({
+        ...settings,
+        theme,
+        todo_opacity: opacity,
+      });
       setSaveMessage('设置已保存');
       setTimeout(() => setSaveMessage(''), 2000);
     } catch (error) {
@@ -46,84 +98,176 @@ export default function Settings() {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleClose = () => {
+    electronAPI?.closeWindow();
+  };
+
+  const handleMinimize = () => {
+    electronAPI?.minimizeWindow();
+  };
+
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-800">AI 分类设置</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            配置大模型 API，用于归档任务时自动判断工作类别
-          </p>
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Title Bar - Draggable, matching TodoWindow style */}
+      <div className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-sky-500">
+            <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="2" />
+            <path d="M8 12l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="text-sm font-medium text-gray-600">设置</span>
         </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleMinimize}
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200/60 text-gray-400 hover:text-gray-600 transition-colors"
+            title="最小化"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M5 12h14" />
+            </svg>
+          </button>
+          <button
+            onClick={handleClose}
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-red-100 text-gray-400 hover:text-red-500 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
-        {/* Settings Form */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
-          {/* API Key */}
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-2xl mx-auto space-y-6">
+
+          {/* Appearance Settings */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              API Key
-            </label>
-            <div className="relative">
-              <input
-                type={showApiKey ? 'text' : 'password'}
-                value={settings.api_key}
-                onChange={(e) => handleChange('api_key', e.target.value)}
-                placeholder="sk-..."
-                className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all pr-10"
-              />
-              <button
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                {showApiKey ? (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </svg>
-                ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                )}
-              </button>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">外观设置</h2>
+            <p className="text-sm text-gray-500 mb-4">调整主题风格和待办清单窗口透明度</p>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+              {/* Theme Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">主题模式</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {THEMES.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => setTheme(t.id)}
+                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                        theme === t.id
+                          ? 'border-sky-500 bg-sky-50 text-sky-600'
+                          : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <ThemeIcon type={t.icon} />
+                      <span className="text-xs font-medium">{t.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Opacity Slider */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  待办清单透明度
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="0.2"
+                    max="1"
+                    step="0.01"
+                    value={opacity}
+                    onChange={(e) => setOpacity(Number(e.target.value))}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                  />
+                  <span className="text-sm text-gray-600 w-12 text-right">
+                    {Math.round(opacity * 100)}%
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">仅影响待办清单悬浮窗口的透明度</p>
+              </div>
             </div>
-            <p className="text-xs text-gray-400 mt-1">输入你的 OpenAI 或兼容 API 的密钥</p>
           </div>
 
-          {/* Base URL */}
+          {/* AI Settings */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Base URL
-            </label>
-            <input
-              type="text"
-              value={settings.base_url}
-              onChange={(e) => handleChange('base_url', e.target.value)}
-              placeholder="https://api.openai.com/v1"
-              className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
-            />
-            <p className="text-xs text-gray-400 mt-1">API 的基础地址，支持 OpenAI 兼容的第三方服务</p>
-          </div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">AI 分类设置</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              配置大模型 API，用于归档任务时自动判断工作类别
+            </p>
 
-          {/* Model */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              模型名称
-            </label>
-            <input
-              type="text"
-              value={settings.model}
-              onChange={(e) => handleChange('model', e.target.value)}
-              placeholder="gpt-4o-mini"
-              className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
-            />
-            <p className="text-xs text-gray-400 mt-1">使用的模型名称，如 gpt-4o-mini、gpt-4、claude-3-haiku 等</p>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+              {/* API Key */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  API Key
+                </label>
+                <div className="relative">
+                  <input
+                    type={showApiKey ? 'text' : 'password'}
+                    value={settings.api_key}
+                    onChange={(e) => handleChange('api_key', e.target.value)}
+                    placeholder="sk-..."
+                    className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all pr-10"
+                  />
+                  <button
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showApiKey ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">输入你的 OpenAI 或兼容 API 的密钥</p>
+              </div>
+
+              {/* Base URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Base URL
+                </label>
+                <input
+                  type="text"
+                  value={settings.base_url}
+                  onChange={(e) => handleChange('base_url', e.target.value)}
+                  placeholder="https://api.openai.com/v1"
+                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                />
+                <p className="text-xs text-gray-400 mt-1">API 的基础地址，支持 OpenAI 兼容的第三方服务</p>
+              </div>
+
+              {/* Model */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  模型名称
+                </label>
+                <input
+                  type="text"
+                  value={settings.model}
+                  onChange={(e) => handleChange('model', e.target.value)}
+                  placeholder="gpt-4o-mini"
+                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                />
+                <p className="text-xs text-gray-400 mt-1">使用的模型名称，如 gpt-4o-mini、gpt-4、claude-3-haiku 等</p>
+              </div>
+            </div>
           </div>
 
           {/* Save Button */}
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={handleSave}
               disabled={isSaving}
@@ -137,48 +281,49 @@ export default function Settings() {
               </span>
             )}
           </div>
-        </div>
 
-        {/* Usage Tips */}
-        <div className="mt-6 bg-gray-50 rounded-xl border border-gray-200 p-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">使用说明</h3>
-          <div className="space-y-2 text-sm text-gray-600">
-            <p>1. 填写 API Key 和相关配置后，点击"保存设置"</p>
-            <p>2. 在历史归档页面，对未分类的任务点击"AI分类"按钮</p>
-            <p>3. 系统会自动调用大模型判断任务类别并更新</p>
-            <p>4. 支持所有 OpenAI 兼容的 API 服务（如 DeepSeek、智谱等）</p>
-          </div>
-        </div>
-
-        {/* Supported Models */}
-        <div className="mt-4 bg-sky-50 rounded-xl border border-sky-100 p-4">
-          <h3 className="text-sm font-medium text-sky-700 mb-2">支持的模型服务</h3>
-          <div className="grid grid-cols-2 gap-2 text-sm text-sky-600">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-sky-400 rounded-full" />
-              OpenAI (GPT-4o, GPT-4)
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-sky-400 rounded-full" />
-              DeepSeek
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-sky-400 rounded-full" />
-              智谱 AI (GLM)
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-sky-400 rounded-full" />
-              通义千问
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-sky-400 rounded-full" />
-              Claude (Anthropic)
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-sky-400 rounded-full" />
-              其他兼容 API
+          {/* Usage Tips */}
+          <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">使用说明</h3>
+            <div className="space-y-2 text-sm text-gray-600">
+              <p>1. 填写 API Key 和相关配置后，点击"保存设置"</p>
+              <p>2. 在历史归档页面，对未分类的任务点击"AI分类"按钮</p>
+              <p>3. 系统会自动调用大模型判断任务类别并更新</p>
+              <p>4. 支持所有 OpenAI 兼容的 API 服务（如 DeepSeek、智谱等）</p>
             </div>
           </div>
+
+          {/* Supported Models */}
+          <div className="bg-sky-50 rounded-xl border border-sky-100 p-4">
+            <h3 className="text-sm font-medium text-sky-700 mb-2">支持的模型服务</h3>
+            <div className="grid grid-cols-2 gap-2 text-sm text-sky-600">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-sky-400 rounded-full" />
+                OpenAI (GPT-4o, GPT-4)
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-sky-400 rounded-full" />
+                DeepSeek
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-sky-400 rounded-full" />
+                智谱 AI (GLM)
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-sky-400 rounded-full" />
+                通义千问
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-sky-400 rounded-full" />
+                Claude (Anthropic)
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-sky-400 rounded-full" />
+                其他兼容 API
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

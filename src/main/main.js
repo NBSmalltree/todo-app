@@ -5,6 +5,7 @@ const Database = require('./database');
 // Keep a global reference to prevent garbage collection
 let floatWindow = null;
 let trayWindow = null;
+let settingsWindow = null;
 let tray = null;
 let db = null;
 
@@ -115,6 +116,46 @@ function createTrayWindow() {
   return trayWindow;
 }
 
+function createSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.show();
+    settingsWindow.focus();
+    return settingsWindow;
+  }
+
+  const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+
+  settingsWindow = new BrowserWindow({
+    width: Math.min(500, screenWidth - 100),
+    height: Math.min(600, screenHeight - 100),
+    show: false,
+    frame: false,
+    title: 'TodoFloat - 设置',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+
+  if (isDev()) {
+    settingsWindow.loadURL('http://localhost:5173#/settings');
+  } else {
+    settingsWindow.loadFile(path.join(__dirname, '../../build/renderer/index.html'), {
+      hash: '/settings',
+    });
+  }
+
+  settingsWindow.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      settingsWindow.hide();
+    }
+  });
+
+  return settingsWindow;
+}
+
 function createTray() {
   const iconSize = process.platform === 'darwin' ? 22 : 16;
   const trayIcon = createTrayIcon(iconSize);
@@ -145,6 +186,14 @@ function createTray() {
       },
     },
     { type: 'separator' },
+    {
+      label: '设置',
+      click: () => {
+        const win = createSettingsWindow();
+        win.show();
+        win.focus();
+      },
+    },
     {
       label: '退出',
       click: () => {
@@ -355,6 +404,29 @@ function setupIPC() {
     const win = createTrayWindow();
     win.show();
     win.focus();
+  });
+
+  // Open settings window
+  ipcMain.handle('openSettingsWindow', () => {
+    const win = createSettingsWindow();
+    win.show();
+    win.focus();
+  });
+
+  // Float window opacity (only affects the todo float window)
+  ipcMain.handle('window:setOpacity', (e, value) => {
+    if (floatWindow) {
+      floatWindow.setOpacity(Math.max(0.2, Math.min(1, value)));
+    }
+  });
+
+  // Apply theme to all windows
+  ipcMain.handle('window:applyTheme', (e, theme) => {
+    [floatWindow, trayWindow, settingsWindow].forEach((win) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('theme-changed', theme);
+      }
+    });
   });
 }
 

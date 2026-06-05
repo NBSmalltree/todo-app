@@ -20,6 +20,22 @@ export default function TodoWindow() {
     loadTodos();
   }, []);
 
+  // Load and apply theme & opacity on mount, listen for changes
+  useEffect(() => {
+    const loadAppearance = async () => {
+      try {
+        const data = await electronAPI.getSettings();
+        if (data.theme) document.documentElement.setAttribute('data-theme', data.theme);
+        if (data.todo_opacity != null) electronAPI.setOpacity(Number(data.todo_opacity));
+      } catch (e) { /* ignore */ }
+    };
+    loadAppearance();
+
+    electronAPI?.onThemeChanged?.((newTheme) => {
+      document.documentElement.setAttribute('data-theme', newTheme);
+    });
+  }, []);
+
   // Handle mouse wheel for scaling - attached to container for reliability
   useEffect(() => {
     const container = listRef.current?.parentElement;

@@ -27,6 +27,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Open tray window
   openTrayWindow: () => ipcRenderer.invoke('openTrayWindow'),
+  openSettingsWindow: () => ipcRenderer.invoke('openSettingsWindow'),
+
+  // Window opacity
+  setOpacity: (value) => ipcRenderer.invoke('window:setOpacity', value),
+
+  // Theme
+  applyTheme: (theme) => ipcRenderer.invoke('window:applyTheme', theme),
 
   // Events
   onScaleChanged: (callback) => {
@@ -34,5 +41,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onNavigate: (callback) => {
     ipcRenderer.on('navigate', (e, route) => callback(route));
+  },
+  onThemeChanged: (callback) => {
+    ipcRenderer.on('theme-changed', (e, theme) => callback(theme));
   },
 });
