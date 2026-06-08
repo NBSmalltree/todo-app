@@ -19,9 +19,8 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Rebuild native modules for Electron
-        run: npx @electron/rebuild
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
 
       - name: Build renderer
         run: npm run build:renderer
@@ -47,9 +46,8 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Rebuild native modules for Electron
-        run: npx @electron/rebuild
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
 
       - name: Build renderer
         run: npm run build:renderer
