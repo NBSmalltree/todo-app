@@ -22,10 +22,12 @@ export default function WorkAnalysis() {
   const loadAnalysis = async () => {
     setIsLoading(true);
     setLlmTip('');
+    setLlmLoading(false);
     try {
       const data = await electronAPI.getWorkAnalysis(period);
       setAnalysis(data);
-      // Trigger LLM analysis
+      setIsLoading(false);
+      // Trigger LLM analysis independently
       if (data && data.totalItems > 0) {
         setLlmLoading(true);
         try {
@@ -39,7 +41,6 @@ export default function WorkAnalysis() {
       }
     } catch (error) {
       console.error('Failed to load analysis:', error);
-    } finally {
       setIsLoading(false);
     }
   };
