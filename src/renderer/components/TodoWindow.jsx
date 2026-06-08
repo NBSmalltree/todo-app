@@ -412,15 +412,17 @@ export default function TodoWindow() {
               标记为已完成
             </button>
           )}
-          <button
-            className="w-full px-4 py-1.5 text-sm text-left text-gray-700 hover:bg-gray-50 transition-colors"
-            onClick={() => {
-              handleArchive(contextMenu.todo.id);
-              setContextMenu(null);
-            }}
-          >
-            归档
-          </button>
+          {contextMenu.todo.completed ? (
+            <button
+              className="w-full px-4 py-1.5 text-sm text-left text-gray-700 hover:bg-gray-50 transition-colors"
+              onClick={() => {
+                handleArchive(contextMenu.todo.id);
+                setContextMenu(null);
+              }}
+            >
+              归档
+            </button>
+          ) : null}
           <div className="h-px bg-gray-100 my-1" />
           <button
             className="w-full px-4 py-1.5 text-sm text-left text-red-500 hover:bg-red-50 transition-colors"

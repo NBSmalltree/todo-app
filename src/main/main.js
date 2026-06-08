@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, dialog } = require('electron');
 const path = require('path');
 const Database = require('./database');
 
@@ -449,6 +449,68 @@ function setupIPC() {
     } catch (err) {
       console.error('[IPC] analyzeWork error:', err.message);
       return null;
+    }
+  });
+
+  // Export CSV
+  ipcMain.handle('export:csv', async (event, filters) => {
+    try {
+      const fs = require('fs');
+      const win = BrowserWindow.fromWebContents(event.sender);
+
+      // Build data based on export type
+      let items;
+      if (filters.exportType === 'active') {
+        items = db.getTodos();
+      } else if (filters.exportType === 'archived') {
+        items = db.getArchived(filters);
+      } else {
+        // 'all' — merge both
+        const active = db.getTodos();
+        const archived = db.getArchived(filters);
+        items = [...archived, ...active];
+      }
+
+      if (!items || items.length === 0) {
+        return { success: false, message: '没有可导出的数据' };
+      }
+
+      // Format CSV with BOM for Excel compatibility
+      const BOM = '﻿';
+      const header = '任务内容,状态,类别,备注,创建时间,完成时间,归档时间\n';
+      const rows = items.map((item) => {
+        const status = item.completed ? '已完成' : '待办';
+        const category = item.category || '未分类';
+        // Escape fields that may contain commas or quotes
+        const escape = (s) => s ? `"${String(s).replace(/"/g, '""')}"` : '';
+        return [
+          escape(item.text),
+          status,
+          escape(category),
+          escape(item.note),
+          item.created_at || '',
+          item.completed_at || '',
+          item.archived_at || '',
+        ].join(',');
+      }).join('\n');
+
+      const csv = BOM + header + rows;
+
+      // Show save dialog
+      const defaultName = `todofloat-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      const { canceled, filePath } = await dialog.showSaveDialog(win, {
+        title: '导出任务数据',
+        defaultPath: defaultName,
+        filters: [{ name: 'CSV 文件', extensions: ['csv'] }],
+      });
+
+      if (canceled || !filePath) return { success: false };
+
+      fs.writeFileSync(filePath, csv, 'utf-8');
+      return { success: true, filePath };
+    } catch (err) {
+      console.error('[IPC] export:csv error:', err.message);
+      return { success: false, message: err.message };
     }
   });
 

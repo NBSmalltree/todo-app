@@ -14,6 +14,8 @@ export default function ArchiveViewer() {
   const [editingNote, setEditingNote] = useState(null);
   const [noteText, setNoteText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [exportType, setExportType] = useState('archived');
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     loadArchives();
@@ -126,6 +128,26 @@ export default function ArchiveViewer() {
     }
   };
 
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const result = await electronAPI.exportCsv({
+        ...filters,
+        exportType,
+      });
+      if (result?.success) {
+        alert(`导出成功：${result.filePath}`);
+      } else if (result?.message) {
+        alert(result.message);
+      }
+    } catch (error) {
+      console.error('Failed to export:', error);
+      alert('导出失败');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
@@ -200,6 +222,26 @@ export default function ArchiveViewer() {
           >
             重置
           </button>
+
+          {/* Export */}
+          <div className="flex items-center gap-2 ml-auto">
+            <select
+              value={exportType}
+              onChange={(e) => setExportType(e.target.value)}
+              className="px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+            >
+              <option value="archived">归档任务</option>
+              <option value="active">待办任务</option>
+              <option value="all">全部任务</option>
+            </select>
+            <button
+              onClick={handleExport}
+              disabled={isExporting}
+              className="px-3 py-1.5 text-sm text-white bg-sky-500 rounded-lg hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isExporting ? '导出中...' : '导出 CSV'}
+            </button>
+          </div>
         </div>
       </div>
 
