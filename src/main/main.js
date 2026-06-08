@@ -415,6 +415,15 @@ function setupIPC() {
     return await llm.categorize(text);
   });
 
+  // LLM work analysis
+  ipcMain.handle('llm:analyzeWork', async (e, data) => {
+    const LLMHelper = require('./llm');
+    const settings = db.getSettings();
+    if (!settings.api_key) return null;
+    const llm = new LLMHelper(settings);
+    return await llm.analyzeWork(data);
+  });
+
   // Window control - works for any calling window
   ipcMain.handle('window:close', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);

@@ -12,6 +12,8 @@ export default function WorkAnalysis() {
   const [period, setPeriod] = useState('week');
   const [analysis, setAnalysis] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [llmTip, setLlmTip] = useState('');
+  const [llmLoading, setLlmLoading] = useState(false);
 
   useEffect(() => {
     loadAnalysis();
@@ -19,9 +21,22 @@ export default function WorkAnalysis() {
 
   const loadAnalysis = async () => {
     setIsLoading(true);
+    setLlmTip('');
     try {
       const data = await electronAPI.getWorkAnalysis(period);
       setAnalysis(data);
+      // Trigger LLM analysis
+      if (data && data.totalItems > 0) {
+        setLlmLoading(true);
+        try {
+          const tip = await electronAPI.analyzeWork(data);
+          setLlmTip(tip || '暂无分析');
+        } catch (e) {
+          setLlmTip('分析生成失败');
+        } finally {
+          setLlmLoading(false);
+        }
+      }
     } catch (error) {
       console.error('Failed to load analysis:', error);
     } finally {
@@ -58,9 +73,9 @@ export default function WorkAnalysis() {
 
   const calculateCompletionRate = () => {
     if (!analysis?.completionStats) return 0;
-    const { total, completed, archived } = analysis.completionStats;
+    const { total, archived } = analysis.completionStats;
     if (!total) return 0;
-    return Math.round(((completed + archived) / total) * 100);
+    return Math.round((archived / total) * 100);
   };
 
   if (isLoading) {
@@ -107,7 +122,11 @@ export default function WorkAnalysis() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="text-2xl font-bold text-sky-600">{analysis.completionStats?.active || 0}</div>
+          <div className="text-sm text-gray-500 mt-1">待办任务</div>
+        </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="text-2xl font-bold text-sky-600">{analysis.totalItems}</div>
           <div className="text-sm text-gray-500 mt-1">归档任务</div>
@@ -199,22 +218,23 @@ export default function WorkAnalysis() {
         </div>
       </div>
 
-      {/* Tips */}
+      {/* AI Work Analysis */}
       <div className="mt-6 bg-sky-50 rounded-xl border border-sky-100 p-4">
         <div className="flex items-start gap-3">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-sky-500 flex-shrink-0 mt-0.5">
             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
             <path d="M12 16v-4M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
-          <div className="text-sm text-sky-700">
-            <p className="font-medium mb-1">工作提示</p>
-            <p className="text-sky-600">
-              {period === 'week'
-                ? '本周工作概览：使用右侧"工作分析"标签页查看更详细的数据分析。'
-                : period === 'month'
-                ? '本月工作回顾：关注各类别任务的完成情况，合理分配下个月的工作重点。'
-                : '年度工作总结：回顾全年工作分布，为下一年的工作规划提供参考。'}
-            </p>
+          <div className="text-sm text-sky-700 flex-1">
+            <p className="font-medium mb-1">AI 工作分析</p>
+            {llmLoading ? (
+              <div className="flex items-center gap-2 text-sky-500">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500" />
+                <span>正在分析中...</span>
+              </div>
+            ) : (
+              <p className="text-sky-600 whitespace-pre-line leading-relaxed">{llmTip}</p>
+            )}
           </div>
         </div>
       </div>

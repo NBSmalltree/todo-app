@@ -47,19 +47,21 @@ class LLMHelper {
 
   async analyzeWork(data) {
     try {
-      const prompt = `你是一个工作效率分析助手。请根据以下工作数据，给出简洁的分析和建议。
+      const prompt = `你是一个工作效率分析助手。请根据以下工作数据，给出针对性的工作分析。
 
 工作周期：${data.period}
-总任务数：${data.totalItems}
+总归档任务数：${data.totalItems}
+待办任务数：${data.completionStats?.active || 0}
+已完成未归档：${data.completionStats?.completed || 0}
+已归档：${data.completionStats?.archived || 0}
 分类分布：${JSON.stringify(data.categoryDistribution, null, 2)}
 每日分布：${JSON.stringify(data.dailyDistribution, null, 2)}
-完成统计：${JSON.stringify(data.completionStats, null, 2)}
 
 请用中文回答，格式要求：
-1. 先总结工作重点（哪些类别投入最多）
-2. 分析工作节奏（哪天最忙等）
-3. 给出1-3条具体建议
-简洁明了，总共不超过300字。`;
+1. 分析工作重点和时间分配（哪些类别投入最多，是否合理）
+2. 分析工作节奏（哪天最忙，是否有规律）
+3. 给出 1-3 条优化建议（如是否需要加大学习投入、减少会议时间等）
+总共不超过500字。`;
 
       const response = await this.client.chat.completions.create({
         model: this.model,
@@ -67,7 +69,7 @@ class LLMHelper {
           { role: 'system', content: '你是一个专业的工作效率分析顾问。' },
           { role: 'user', content: prompt },
         ],
-        max_tokens: 500,
+        max_tokens: 10000,
         temperature: 0.7,
       });
 

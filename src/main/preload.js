@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // LLM
   categorize: (text) => ipcRenderer.invoke('llm:categorize', text),
+  analyzeWork: (data) => ipcRenderer.invoke('llm:analyzeWork', data),
 
   // Window control
   closeWindow: () => ipcRenderer.invoke('window:close'),

@@ -181,15 +181,16 @@ class TodoDatabase {
       dailyCount[day] = (dailyCount[day] || 0) + 1;
     });
 
-    // Completion stats
+    // Completion stats - all todos regardless of creation time
     const totalTodos = this.db
       .prepare(
         `SELECT COUNT(*) as total,
-                SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed,
-                SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) as archived
-         FROM todos WHERE created_at >= ?`
+                SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) as archived,
+                SUM(CASE WHEN archived = 0 AND completed = 1 THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN archived = 0 AND completed = 0 THEN 1 ELSE 0 END) as active
+         FROM todos`
       )
-      .get(dateFilter);
+      .get();
 
     return {
       period,
