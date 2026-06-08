@@ -7,6 +7,7 @@ export default function TodoWindow() {
   const [inputText, setInputText] = useState('');
   const [contextMenu, setContextMenu] = useState(null);
   const [scale, setScale] = useState(1);
+  const [opacity, setOpacity] = useState(1);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeStart, setResizeStart] = useState(null);
   const [newIds, setNewIds] = useState(new Set());
@@ -33,7 +34,7 @@ export default function TodoWindow() {
         }
         if (data.todo_opacity != null) {
           const v = Number(data.todo_opacity);
-          if (!isNaN(v) && v >= 0.2 && v <= 1) electronAPI.setOpacity(v);
+          if (!isNaN(v) && v >= 0.2 && v <= 1) setOpacity(v);
         }
       } catch (e) { /* ignore */ }
     };
@@ -46,6 +47,11 @@ export default function TodoWindow() {
     // Auto-refresh when data changes from archive window
     electronAPI?.onDataChanged?.(() => {
       loadTodos();
+    });
+
+    // Listen for opacity changes from settings
+    electronAPI?.onOpacityChanged?.((v) => {
+      setOpacity(v);
     });
   }, []);
 
@@ -241,7 +247,7 @@ export default function TodoWindow() {
   const completedTodos = todos.filter((t) => t.completed);
 
   return (
-    <div className="h-full overflow-hidden">
+    <div className="h-full overflow-hidden" style={{ opacity }}>
       <div className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100" style={{ zoom: scale, transition: 'zoom 0.15s ease-out' }}>
       {/* Title Bar - Draggable */}
       <div className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100">

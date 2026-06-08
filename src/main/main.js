@@ -496,14 +496,11 @@ function setupIPC() {
     win.focus();
   });
 
-  // Float window opacity (only affects the todo float window)
+  // Float window opacity — send to renderer as CSS (setOpacity causes Windows hang)
   ipcMain.handle('window:setOpacity', (e, value) => {
-    try {
-      if (floatWindow && !floatWindow.isDestroyed()) {
-        floatWindow.setOpacity(Math.max(0.2, Math.min(1, value)));
-      }
-    } catch (err) {
-      console.error('[IPC] setOpacity error:', err.message);
+    const opacity = Math.max(0.2, Math.min(1, value));
+    if (floatWindow && !floatWindow.isDestroyed()) {
+      floatWindow.webContents.send('opacity-changed', opacity);
     }
   });
 

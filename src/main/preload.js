@@ -50,4 +50,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onDataChanged: (callback) => {
     ipcRenderer.on('data-changed', () => callback());
   },
+  onOpacityChanged: (callback) => {
+    ipcRenderer.on('opacity-changed', (e, opacity) => callback(opacity));
+  },
 });
