@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
+import ReactMarkdown from 'react-markdown';
 
 const { electronAPI } = window;
 
@@ -234,7 +235,9 @@ export default function WorkAnalysis() {
                 <span>正在分析中...</span>
               </div>
             ) : (
-              <p className="text-sky-600 whitespace-pre-line leading-relaxed">{llmTip}</p>
+              <div className="text-sky-600 leading-relaxed prose prose-sm prose-sky max-w-none">
+                <ReactMarkdown>{llmTip}</ReactMarkdown>
+              </div>
             )}
           </div>
         </div>

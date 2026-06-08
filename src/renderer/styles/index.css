@@ -24,6 +24,17 @@ input, textarea {
   -webkit-user-select: text;
 }
 
+/* Allow text selection in Markdown content */
+.prose {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.prose * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 #root {
   width: 100%;
   height: 100%;

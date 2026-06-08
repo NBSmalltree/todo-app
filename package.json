@@ -11,8 +11,10 @@
   "author": "TodoFloat",
   "license": "MIT",
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.19",
     "better-sqlite3": "^11.7.0",
-    "openai": "^4.77.0"
+    "openai": "^4.77.0",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.2",
