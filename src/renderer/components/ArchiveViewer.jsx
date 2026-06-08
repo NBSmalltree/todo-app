@@ -98,6 +98,16 @@ export default function ArchiveViewer() {
     }
   };
 
+  const handleDelete = async (id) => {
+    try {
+      await electronAPI.deleteTodo(id);
+      await loadArchives();
+      await loadCategories();
+    } catch (error) {
+      console.error('Failed to delete:', error);
+    }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
@@ -265,6 +275,13 @@ export default function ArchiveViewer() {
                           title="使用AI自动分类"
                         >
                           {item.category ? '重新分类' : 'AI分类'}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded hover:bg-red-100 transition-colors"
+                          title="删除此记录"
+                        >
+                          删除
                         </button>
                       </div>
                     </td>
