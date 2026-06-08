@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "concurrently --kill-others \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build && electron-builder",
-    "build:renderer": "vite build"
+    "build:renderer": "vite build",
+    "release": "bash scripts/release.sh"
   },
   "author": "TodoFloat",
   "license": "MIT",
