@@ -365,8 +365,39 @@ function setupIPC() {
   ipcMain.handle('db:addTodo', (e, text) => db.addTodo(text));
   ipcMain.handle('db:toggleTodo', (e, id) => db.toggleTodo(id));
   ipcMain.handle('db:deleteTodo', (e, id) => db.deleteTodo(id));
-  ipcMain.handle('db:restoreTodo', (e, id) => db.restoreTodo(id));
-  ipcMain.handle('db:archiveTodo', (e, id) => db.archiveTodo(id));
+  ipcMain.handle('db:restoreTodo', (e, id) => {
+    const result = db.restoreTodo(id);
+    // Notify float window to refresh
+    if (floatWindow && !floatWindow.isDestroyed()) {
+      floatWindow.webContents.send('data-changed');
+    }
+    return result;
+  });
+  ipcMain.handle('db:archiveTodo', async (e, id) => {
+    const todo = db.archiveTodo(id);
+    // Notify tray window to refresh
+    if (trayWindow && !trayWindow.isDestroyed()) {
+      trayWindow.webContents.send('data-changed');
+    }
+    // Auto-categorize in background
+    if (todo && !todo.category) {
+      const settings = db.getSettings();
+      if (settings.api_key) {
+        const LLMHelper = require('./llm');
+        const llm = new LLMHelper(settings);
+        llm.categorize(todo.text).then((category) => {
+          if (category) {
+            db.updateCategory(id, category);
+            // Notify tray window again after categorization
+            if (trayWindow && !trayWindow.isDestroyed()) {
+              trayWindow.webContents.send('data-changed');
+            }
+          }
+        }).catch(() => {});
+      }
+    }
+    return todo;
+  });
   ipcMain.handle('db:getArchived', (e, filters) => db.getArchived(filters));
   ipcMain.handle('db:updateNote', (e, id, note) => db.updateNote(id, note));
   ipcMain.handle('db:updateCategory', (e, id, category) => db.updateCategory(id, category));

@@ -20,6 +20,14 @@ export default function ArchiveViewer() {
     loadCategories();
   }, [filters]);
 
+  // Auto-refresh when data changes (archive or categorize)
+  useEffect(() => {
+    electronAPI?.onDataChanged?.(() => {
+      loadArchives();
+      loadCategories();
+    });
+  }, []);
+
   const loadArchives = async () => {
     setIsLoading(true);
     try {
@@ -105,6 +113,16 @@ export default function ArchiveViewer() {
       await loadCategories();
     } catch (error) {
       console.error('Failed to delete:', error);
+    }
+  };
+
+  const handleRestore = async (id) => {
+    try {
+      await electronAPI.restoreTodo(id);
+      await loadArchives();
+      await loadCategories();
+    } catch (error) {
+      console.error('Failed to restore:', error);
     }
   };
 
@@ -225,7 +243,7 @@ export default function ArchiveViewer() {
                 {archives.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
-                      <span className={`text-sm ${item.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                      <span className="text-sm text-gray-700">
                         {item.text}
                       </span>
                     </td>
@@ -274,7 +292,14 @@ export default function ArchiveViewer() {
                           className="px-2 py-1 text-xs text-sky-600 bg-sky-50 rounded hover:bg-sky-100 transition-colors"
                           title="使用AI自动分类"
                         >
-                          {item.category ? '重新分类' : 'AI分类'}
+                          AI分类
+                        </button>
+                        <button
+                          onClick={() => handleRestore(item.id)}
+                          className="px-2 py-1 text-xs text-green-600 bg-green-50 rounded hover:bg-green-100 transition-colors"
+                          title="恢复为待办"
+                        >
+                          恢复
                         </button>
                         <button
                           onClick={() => handleDelete(item.id)}

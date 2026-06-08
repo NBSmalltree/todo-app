@@ -71,7 +71,7 @@ class TodoDatabase {
 
   restoreTodo(id) {
     this.db
-      .prepare('UPDATE todos SET completed = 0, completed_at = NULL WHERE id = ?')
+      .prepare('UPDATE todos SET completed = 0, completed_at = NULL, archived = 0, archived_at = NULL WHERE id = ?')
       .run(id);
     return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
   }

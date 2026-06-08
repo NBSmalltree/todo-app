@@ -37,6 +37,11 @@ export default function TodoWindow() {
     electronAPI?.onThemeChanged?.((newTheme) => {
       document.documentElement.setAttribute('data-theme', newTheme);
     });
+
+    // Auto-refresh when data changes from archive window
+    electronAPI?.onDataChanged?.(() => {
+      loadTodos();
+    });
   }, []);
 
   // Handle mouse wheel for scaling - attached to container for reliability

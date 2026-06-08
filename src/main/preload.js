@@ -46,4 +46,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onThemeChanged: (callback) => {
     ipcRenderer.on('theme-changed', (e, theme) => callback(theme));
   },
+  onDataChanged: (callback) => {
+    ipcRenderer.on('data-changed', () => callback());
+  },
 });
