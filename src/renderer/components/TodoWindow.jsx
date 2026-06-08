@@ -28,8 +28,13 @@ export default function TodoWindow() {
     const loadAppearance = async () => {
       try {
         const data = await electronAPI.getSettings();
-        if (data.theme) document.documentElement.setAttribute('data-theme', data.theme);
-        if (data.todo_opacity != null) electronAPI.setOpacity(Number(data.todo_opacity));
+        if (data.theme && ['light', 'dark', 'eye-care'].includes(data.theme)) {
+          document.documentElement.setAttribute('data-theme', data.theme);
+        }
+        if (data.todo_opacity != null) {
+          const v = Number(data.todo_opacity);
+          if (!isNaN(v) && v >= 0.2 && v <= 1) electronAPI.setOpacity(v);
+        }
       } catch (e) { /* ignore */ }
     };
     loadAppearance();

@@ -33,6 +33,17 @@ function createFloatWindow() {
     }
   } catch (e) { /* use defaults */ }
 
+  // Validate bounds are within visible screen area
+  const displays = screen.getAllDisplays();
+  const isVisible = displays.some((d) => {
+    const { x, y, width, height } = d.workArea;
+    return bounds.x >= x - 100 && bounds.x < x + width &&
+           bounds.y >= y - 100 && bounds.y < y + height;
+  });
+  if (!isVisible) {
+    bounds = { x: 100, y: 100, width: BASE_WIDTH, height: BASE_HEIGHT };
+  }
+
   // Initialize scale from saved size
   windowScale = Math.round((bounds.width / BASE_WIDTH + bounds.height / BASE_HEIGHT) / 2 * 10) / 10;
 
@@ -404,24 +415,41 @@ function setupIPC() {
   ipcMain.handle('db:getCategories', () => db.getCategories());
   ipcMain.handle('db:getWorkAnalysis', (e, period) => db.getWorkAnalysis(period));
   ipcMain.handle('db:getSettings', () => db.getSettings());
-  ipcMain.handle('db:saveSettings', (e, settings) => db.saveSettings(settings));
+  ipcMain.handle('db:saveSettings', (e, settings) => {
+    try {
+      return db.saveSettings(settings);
+    } catch (err) {
+      console.error('[IPC] saveSettings error:', err.message);
+      return { success: false, error: err.message };
+    }
+  });
 
   // LLM categorization
   ipcMain.handle('llm:categorize', async (e, text) => {
-    const LLMHelper = require('./llm');
-    const settings = db.getSettings();
-    if (!settings.api_key) return null;
-    const llm = new LLMHelper(settings);
-    return await llm.categorize(text);
+    try {
+      const LLMHelper = require('./llm');
+      const settings = db.getSettings();
+      if (!settings.api_key) return null;
+      const llm = new LLMHelper(settings);
+      return await llm.categorize(text);
+    } catch (err) {
+      console.error('[IPC] categorize error:', err.message);
+      return null;
+    }
   });
 
   // LLM work analysis
   ipcMain.handle('llm:analyzeWork', async (e, data) => {
-    const LLMHelper = require('./llm');
-    const settings = db.getSettings();
-    if (!settings.api_key) return null;
-    const llm = new LLMHelper(settings);
-    return await llm.analyzeWork(data);
+    try {
+      const LLMHelper = require('./llm');
+      const settings = db.getSettings();
+      if (!settings.api_key) return null;
+      const llm = new LLMHelper(settings);
+      return await llm.analyzeWork(data);
+    } catch (err) {
+      console.error('[IPC] analyzeWork error:', err.message);
+      return null;
+    }
   });
 
   // Window control - works for any calling window
@@ -470,16 +498,24 @@ function setupIPC() {
 
   // Float window opacity (only affects the todo float window)
   ipcMain.handle('window:setOpacity', (e, value) => {
-    if (floatWindow) {
-      floatWindow.setOpacity(Math.max(0.2, Math.min(1, value)));
+    try {
+      if (floatWindow && !floatWindow.isDestroyed()) {
+        floatWindow.setOpacity(Math.max(0.2, Math.min(1, value)));
+      }
+    } catch (err) {
+      console.error('[IPC] setOpacity error:', err.message);
     }
   });
 
   // Apply theme to all windows
   ipcMain.handle('window:applyTheme', (e, theme) => {
     [floatWindow, trayWindow, settingsWindow].forEach((win) => {
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('theme-changed', theme);
+      try {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('theme-changed', theme);
+        }
+      } catch (err) {
+        console.error('[IPC] applyTheme send error:', err.message);
       }
     });
   });

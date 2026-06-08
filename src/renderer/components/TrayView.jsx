@@ -37,7 +37,9 @@ export default function TrayView() {
     const loadTheme = async () => {
       try {
         const data = await electronAPI.getSettings();
-        if (data.theme) document.documentElement.setAttribute('data-theme', data.theme);
+        if (data.theme && ['light', 'dark', 'eye-care'].includes(data.theme)) {
+          document.documentElement.setAttribute('data-theme', data.theme);
+        }
       } catch (e) { /* ignore */ }
     };
     loadTheme();

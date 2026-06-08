@@ -54,12 +54,12 @@ export default function Settings() {
   // Apply theme whenever it changes
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    electronAPI?.applyTheme(theme);
+    try { electronAPI?.applyTheme(theme); } catch (e) { /* ignore */ }
   }, [theme]);
 
   // Apply opacity whenever it changes
   useEffect(() => {
-    electronAPI?.setOpacity(opacity);
+    try { electronAPI?.setOpacity(opacity); } catch (e) { /* ignore */ }
   }, [opacity]);
 
   const loadSettings = async () => {
@@ -68,8 +68,11 @@ export default function Settings() {
       if (data.api_key) setSettings((prev) => ({ ...prev, api_key: data.api_key }));
       if (data.base_url) setSettings((prev) => ({ ...prev, base_url: data.base_url }));
       if (data.model) setSettings((prev) => ({ ...prev, model: data.model }));
-      if (data.theme) setTheme(data.theme);
-      if (data.todo_opacity != null) setOpacity(Number(data.todo_opacity));
+      if (data.theme && ['light', 'dark', 'eye-care'].includes(data.theme)) setTheme(data.theme);
+      if (data.todo_opacity != null) {
+        const v = Number(data.todo_opacity);
+        if (!isNaN(v) && v >= 0.2 && v <= 1) setOpacity(v);
+      }
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
