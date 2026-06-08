@@ -27,9 +27,7 @@ jobs:
         run: npm run build:renderer
 
       - name: Build Electron app
-        run: npx electron-builder --mac
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --mac --publish never
 
       - name: Upload Mac artifacts
         uses: actions/upload-artifact@v4
@@ -57,9 +55,7 @@ jobs:
         run: npm run build:renderer
 
       - name: Build Electron app
-        run: npx electron-builder --win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --publish never
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
