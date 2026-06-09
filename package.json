@@ -1,6 +1,6 @@
 {
   "name": "todo-float",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "轻量级桌面待办清单 - 漂浮在所有窗口顶端",
   "main": "src/main/main.js",
   "scripts": {
