@@ -406,17 +406,6 @@ export default function TodoWindow() {
           <span className="text-sm font-medium text-gray-600">待办清单</span>
         </div>
         <div className="flex items-center gap-1">
-          {edgeState.snapped && (
-            <button
-              onClick={() => electronAPI?.toggleEdgeHide()}
-              className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200/60 text-gray-400 hover:text-gray-600 transition-colors"
-              title="取消吸附"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2v6m0 0L9 5m3 3l3-3M12 22v-6m0 0l-3 3m3-3l3 3M2 12h6m0 0L5 9m3 3L5 15M22 12h-6m0 0l3-3m-3 3l3 3" />
-              </svg>
-            </button>
-          )}
           <button
             onClick={handleOpenTray}
             className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200/60 text-gray-400 hover:text-gray-600 transition-colors"
