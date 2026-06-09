@@ -574,7 +574,13 @@ function setupIPC() {
   // Window control - works for any calling window
   ipcMain.handle('window:close', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
-    if (win) win.hide();
+    if (win) {
+      // If edge manager is active, un-snap before hiding
+      if (edgeManager && win === floatWindow && edgeManager.state !== 'FREE') {
+        edgeManager.unSnap();
+      }
+      win.hide();
+    }
   });
 
   ipcMain.handle('window:minimize', (event) => {
