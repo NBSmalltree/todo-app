@@ -413,6 +413,8 @@ function setupIPC() {
   ipcMain.handle('db:updateNote', (e, id, note) => db.updateNote(id, note));
   ipcMain.handle('db:updateCategory', (e, id, category) => db.updateCategory(id, category));
   ipcMain.handle('db:getCategories', () => db.getCategories());
+  ipcMain.handle('db:reorder', (e, orders) => db.updateOrders(orders));
+  ipcMain.handle('db:updateColor', (e, id, color) => db.updateColor(id, color));
   ipcMain.handle('db:getWorkAnalysis', (e, period) => db.getWorkAnalysis(period));
   ipcMain.handle('db:getSettings', () => db.getSettings());
   ipcMain.handle('db:saveSettings', (e, settings) => {

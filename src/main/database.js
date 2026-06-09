@@ -34,18 +34,52 @@ class TodoDatabase {
       CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(created_at);
       CREATE INDEX IF NOT EXISTS idx_todos_archived_at ON todos(archived_at);
     `);
+
+    // Migration: add sort_order column if missing
+    try {
+      this.db.exec('ALTER TABLE todos ADD COLUMN sort_order INTEGER');
+      // Initialize sort_order for existing rows: active items by created_at DESC
+      this.db.exec(`
+        UPDATE todos SET sort_order = (
+          SELECT COUNT(*) FROM todos t2
+          WHERE t2.archived = 0 AND t2.completed = 0
+            AND (t2.created_at > todos.created_at OR (t2.created_at = todos.created_at AND t2.id > todos.id))
+        ) WHERE archived = 0 AND completed = 0
+      `);
+    } catch (e) { /* column already exists */ }
+
+    // Migration: add color column if missing
+    try {
+      this.db.exec('ALTER TABLE todos ADD COLUMN color TEXT');
+    } catch (e) { /* column already exists */ }
   }
 
   getTodos() {
     return this.db
-      .prepare('SELECT * FROM todos WHERE archived = 0 ORDER BY completed ASC, created_at DESC')
+      .prepare('SELECT * FROM todos WHERE archived = 0 ORDER BY completed ASC, sort_order ASC, created_at DESC')
       .all();
   }
 
   addTodo(text) {
-    const stmt = this.db.prepare('INSERT INTO todos (text) VALUES (?)');
-    const result = stmt.run(text);
+    const maxOrder = this.db.prepare('SELECT MAX(sort_order) as maxOrder FROM todos WHERE archived = 0 AND completed = 0').get();
+    const nextOrder = (maxOrder?.maxOrder ?? -1) + 1;
+    const stmt = this.db.prepare('INSERT INTO todos (text, sort_order) VALUES (?, ?)');
+    const result = stmt.run(text, nextOrder);
     return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  updateOrders(orders) {
+    const stmt = this.db.prepare('UPDATE todos SET sort_order = ? WHERE id = ?');
+    const transaction = this.db.transaction((items) => {
+      items.forEach(({ id, sort_order }) => stmt.run(sort_order, id));
+    });
+    transaction(orders);
+    return { success: true };
+  }
+
+  updateColor(id, color) {
+    this.db.prepare('UPDATE todos SET color = ? WHERE id = ?').run(color || null, id);
+    return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
   }
 
   toggleTodo(id) {

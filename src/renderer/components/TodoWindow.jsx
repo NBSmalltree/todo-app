@@ -13,6 +13,8 @@ export default function TodoWindow() {
   const [newIds, setNewIds] = useState(new Set());
   const [exitingIds, setExitingIds] = useState(new Set());
   const [checkPulseIds, setCheckPulseIds] = useState(new Set());
+  const [dragId, setDragId] = useState(null);       // item being dragged
+  const [dragOverId, setDragOverId] = useState(null); // item being hovered over
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const isComposingRef = useRef(false); // Track IME composition state
@@ -186,6 +188,75 @@ export default function TodoWindow() {
     });
   };
 
+  // Drag-and-drop handlers for active todos
+  const handleDragStart = (e, id) => {
+    setDragId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    // Set transparent drag image for custom styling
+    const img = new Image();
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    e.dataTransfer.setDragImage(img, 0, 0);
+  };
+
+  const handleDragOver = (e, id) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (id !== dragOverId) setDragOverId(id);
+  };
+
+  const handleDrop = async (e, targetId) => {
+    e.preventDefault();
+    if (!dragId || dragId === targetId) {
+      setDragId(null);
+      setDragOverId(null);
+      return;
+    }
+
+    const active = todos.filter((t) => !t.completed);
+    const dragIdx = active.findIndex((t) => t.id === dragId);
+    const targetIdx = active.findIndex((t) => t.id === targetId);
+    if (dragIdx === -1 || targetIdx === -1) return;
+
+    // Reorder locally
+    const reordered = [...active];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(targetIdx, 0, moved);
+
+    // Persist new order
+    const orders = reordered.map((t, i) => ({ id: t.id, sort_order: i }));
+    try {
+      await electronAPI.reorder(orders);
+      await loadTodos();
+    } catch (err) {
+      console.error('Failed to reorder:', err);
+    }
+
+    setDragId(null);
+    setDragOverId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragId(null);
+    setDragOverId(null);
+  };
+
+  // Color options for urgency levels
+  const COLOR_OPTIONS = [
+    { value: 'red',    label: '紧急', css: 'bg-red-400' },
+    { value: 'orange', label: '重要', css: 'bg-orange-400' },
+    { value: 'yellow', label: '一般', css: 'bg-yellow-400' },
+    { value: 'green',  label: '低优', css: 'bg-green-400' },
+  ];
+
+  const handleColorChange = async (id, color) => {
+    try {
+      await electronAPI.updateColor(id, color);
+      await loadTodos();
+    } catch (error) {
+      console.error('Failed to update color:', error);
+    }
+  };
+
   const handleKeyDown = (e) => {
     // Don't submit while IME composition is active (e.g. typing Chinese)
     if (e.key === 'Enter' && !isComposingRef.current) {
@@ -307,29 +378,55 @@ export default function TodoWindow() {
       {/* Todo List */}
       <div ref={listRef} className="flex-1 overflow-y-auto px-2 py-1">
         {/* Active Todos */}
-        {activeTodos.map((todo) => (
-          <div
-            key={todo.id}
-            className={`todo-item flex items-center gap-2 px-2 py-1.5 rounded-lg group cursor-default ${newIds.has(todo.id) ? 'todo-enter' : ''} ${exitingIds.has(todo.id) ? 'todo-exit' : ''}`}
-            onContextMenu={(e) => handleContextMenu(e, todo)}
-          >
-            <button
-              onClick={() => handleToggle(todo.id)}
-              className={`flex-shrink-0 w-5 h-5 rounded-full border-2 border-gray-300 hover:border-sky-400 transition-colors flex items-center justify-center ${checkPulseIds.has(todo.id) ? 'todo-check-animate' : ''}`}
+        {activeTodos.map((todo) => {
+          const colorMap = { red: '#f87171', orange: '#fb923c', yellow: '#facc15', green: '#4ade80' };
+          const borderColor = todo.color ? colorMap[todo.color] : null;
+          return (
+          <div key={todo.id}>
+            {/* Drop indicator line */}
+            {dragOverId === todo.id && dragId !== todo.id && (
+              <div className="h-0.5 bg-sky-400 rounded-full mx-2 transition-all" />
+            )}
+            <div
+              draggable
+              onDragStart={(e) => handleDragStart(e, todo.id)}
+              onDragOver={(e) => handleDragOver(e, todo.id)}
+              onDrop={(e) => handleDrop(e, todo.id)}
+              onDragEnd={handleDragEnd}
+              className={`todo-item flex items-center gap-2 px-2 py-1.5 rounded-lg group cursor-default
+                ${newIds.has(todo.id) ? 'todo-enter' : ''}
+                ${exitingIds.has(todo.id) ? 'todo-exit' : ''}
+                ${dragId === todo.id ? 'opacity-40' : ''}
+                ${dragOverId === todo.id && dragId !== todo.id ? 'bg-sky-50' : ''}
+              `}
+              style={borderColor ? { borderLeft: `3px solid ${borderColor}` } : undefined}
+              onContextMenu={(e) => handleContextMenu(e, todo)}
             >
-              {/* Empty circle for uncompleted */}
-            </button>
-            <span className="flex-1 text-sm text-gray-700 truncate">{todo.text}</span>
-            <button
-              onClick={() => handleDelete(todo.id)}
-              className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12" />
+              {/* Drag handle */}
+              <svg className="flex-shrink-0 w-3.5 h-3.5 text-gray-300 group-hover:text-gray-400 cursor-grab active:cursor-grabbing" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="5" cy="3" r="1.5" /><circle cx="11" cy="3" r="1.5" />
+                <circle cx="5" cy="8" r="1.5" /><circle cx="11" cy="8" r="1.5" />
+                <circle cx="5" cy="13" r="1.5" /><circle cx="11" cy="13" r="1.5" />
               </svg>
-            </button>
+              <button
+                onClick={() => handleToggle(todo.id)}
+                className={`flex-shrink-0 w-5 h-5 rounded-full border-2 border-gray-300 hover:border-sky-400 transition-colors flex items-center justify-center ${checkPulseIds.has(todo.id) ? 'todo-check-animate' : ''}`}
+              >
+                {/* Empty circle for uncompleted */}
+              </button>
+              <span className="flex-1 text-sm text-gray-700 truncate">{todo.text}</span>
+              <button
+                onClick={() => handleDelete(todo.id)}
+                className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
-        ))}
+          );
+        })}
 
         {/* Separator if both sections have items */}
         {activeTodos.length > 0 && completedTodos.length > 0 && (
@@ -391,6 +488,36 @@ export default function TodoWindow() {
           className="context-menu fixed bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
+          {/* Color picker - only for active items */}
+          {!contextMenu.todo.completed && (
+            <div className="px-4 py-1.5 flex items-center gap-2">
+              {COLOR_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  title={opt.label}
+                  className={`w-5 h-5 rounded-full ${opt.css} transition-transform hover:scale-125 ${contextMenu.todo.color === opt.value ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : ''}`}
+                  onClick={() => {
+                    handleColorChange(contextMenu.todo.id, contextMenu.todo.color === opt.value ? null : opt.value);
+                    setContextMenu(null);
+                  }}
+                />
+              ))}
+              {contextMenu.todo.color && (
+                <button
+                  title="清除颜色"
+                  className="w-5 h-5 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-gray-400 transition-colors"
+                  onClick={() => {
+                    handleColorChange(contextMenu.todo.id, null);
+                    setContextMenu(null);
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
           {contextMenu.todo.completed ? (
             <button
               className="w-full px-4 py-1.5 text-sm text-left text-gray-700 hover:bg-gray-50 transition-colors"

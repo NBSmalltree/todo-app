@@ -4,7 +4,7 @@
   "description": "轻量级桌面待办清单 - 漂浮在所有窗口顶端",
   "main": "src/main/main.js",
   "scripts": {
-    "dev": "concurrently --kill-others \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev": "concurrently --kill-others \"vite\" \"wait-on http://localhost:5173 && unset ELECTRON_RUN_AS_NODE && electron .\"",
     "build": "vite build && electron-builder",
     "build:renderer": "vite build",
     "release": "bash scripts/release.sh"
@@ -24,7 +24,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.2",
-    "electron": "^33.3.1",
+    "electron": "^33.4.11",
     "electron-builder": "^25.1.8",
     "postcss": "^8.4.49",
     "react": "^18.3.1",
