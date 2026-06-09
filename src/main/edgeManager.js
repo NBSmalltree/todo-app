@@ -107,6 +107,11 @@ class EdgeManager {
 
   // Snap window to edge with animation
   snapToEdge(edge, workArea) {
+    if (!edge || !workArea) {
+      console.error('[EdgeManager] Invalid snap parameters:', edge, workArea);
+      return;
+    }
+
     this.isAnimating = true;
     this.savedBounds = this.win.getBounds();
     this.snappedEdge = edge;
@@ -132,6 +137,18 @@ class EdgeManager {
         targetX = curX;
         targetY = workArea.y + workArea.height - h;
         break;
+      default:
+        console.error('[EdgeManager] Unknown edge:', edge);
+        this.isAnimating = false;
+        return;
+    }
+
+    // Validate target coordinates
+    if (typeof targetX !== 'number' || typeof targetY !== 'number' ||
+        isNaN(targetX) || isNaN(targetY)) {
+      console.error('[EdgeManager] Invalid target coordinates:', targetX, targetY);
+      this.isAnimating = false;
+      return;
     }
 
     this.animateTo(targetX, targetY, 200, () => {
@@ -192,6 +209,10 @@ class EdgeManager {
   // Hide window (slide off-screen)
   hideWindow() {
     if (this.state !== 'SNAPPED') return;
+    if (!this.snappedDisplay || !this.snappedEdge) {
+      console.error('[EdgeManager] Missing snap state for hide');
+      return;
+    }
 
     this.clearHideTimer();
     this.state = 'HIDING';
@@ -218,6 +239,10 @@ class EdgeManager {
         targetX = curX;
         targetY = wa.y + wa.height - this.triggerZoneSize;
         break;
+      default:
+        console.error('[EdgeManager] Unknown edge for hide:', this.snappedEdge);
+        this.state = 'SNAPPED';
+        return;
     }
 
     this.animateTo(targetX, targetY, 250, () => {
@@ -230,6 +255,10 @@ class EdgeManager {
   // Show window (slide back on-screen)
   showWindow() {
     if (this.state !== 'HIDDEN') return;
+    if (!this.snappedDisplay || !this.snappedEdge) {
+      console.error('[EdgeManager] Missing snap state for show');
+      return;
+    }
 
     this.stopMousePolling();
     this.state = 'HIDING';
@@ -255,6 +284,10 @@ class EdgeManager {
         targetX = this.win.getPosition()[0];
         targetY = wa.y + wa.height - h;
         break;
+      default:
+        console.error('[EdgeManager] Unknown edge for show:', this.snappedEdge);
+        this.state = 'SNAPPED';
+        return;
     }
 
     this.animateTo(targetX, targetY, 250, () => {
@@ -359,6 +392,14 @@ class EdgeManager {
 
   // Animate window position
   animateTo(targetX, targetY, duration, callback) {
+    // Validate parameters
+    if (typeof targetX !== 'number' || typeof targetY !== 'number' ||
+        isNaN(targetX) || isNaN(targetY)) {
+      console.error('[EdgeManager] Invalid animation target:', targetX, targetY);
+      if (callback) callback();
+      return;
+    }
+
     const startX = this.win.getPosition()[0];
     const startY = this.win.getPosition()[1];
     const startTime = Date.now();
@@ -370,6 +411,14 @@ class EdgeManager {
 
       const curX = Math.round(startX + (targetX - startX) * ease);
       const curY = Math.round(startY + (targetY - startY) * ease);
+
+      // Ensure values are valid integers
+      if (isNaN(curX) || isNaN(curY)) {
+        console.error('[EdgeManager] Animation produced NaN values');
+        if (callback) callback();
+        return;
+      }
+
       this.win.setPosition(curX, curY, false);
 
       if (t < 1) {
