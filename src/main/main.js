@@ -657,6 +657,19 @@ function setupIPC() {
       }
     });
   });
+
+  // Apply font family to all windows
+  ipcMain.handle('window:applyFontFamily', (e, font) => {
+    [floatWindow, trayWindow, settingsWindow].forEach((win) => {
+      try {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('font-family-changed', font);
+        }
+      } catch (err) {
+        console.error('[IPC] applyFontFamily send error:', err.message);
+      }
+    });
+  });
 }
 
 // Single instance lock - prevent multiple instances (especially on Windows)

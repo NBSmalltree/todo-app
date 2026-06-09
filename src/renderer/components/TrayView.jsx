@@ -68,6 +68,11 @@ export default function TrayView() {
       document.documentElement.setAttribute('data-theme', newTheme);
     });
 
+    // Listen for font family changes from settings
+    electronAPI?.onFontFamilyChanged?.((font) => {
+      applyFontFamily(font);
+    });
+
     // Check initial maximized state
     checkMaximizedState();
   }, []);

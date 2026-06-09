@@ -68,6 +68,12 @@ export default function Settings() {
     try { electronAPI?.setOpacity(opacity); } catch (e) { /* ignore */ }
   }, [opacity]);
 
+  // Apply font family whenever it changes
+  useEffect(() => {
+    applyFontFamily(fontFamily);
+    try { electronAPI?.applyFontFamily(fontFamily); } catch (e) { /* ignore */ }
+  }, [fontFamily]);
+
   // Apply font family on mount
   useEffect(() => {
     applyFontFamily(fontFamily);

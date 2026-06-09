@@ -43,6 +43,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Theme
   applyTheme: (theme) => ipcRenderer.invoke('window:applyTheme', theme),
 
+  // Font family
+  applyFontFamily: (font) => ipcRenderer.invoke('window:applyFontFamily', font),
+
   // Edge management
   toggleEdgeHide: () => ipcRenderer.invoke('edge:toggleHide'),
   getEdgeSettings: () => ipcRenderer.invoke('edge:getSettings'),
@@ -57,6 +60,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onThemeChanged: (callback) => {
     ipcRenderer.on('theme-changed', (e, theme) => callback(theme));
+  },
+  onFontFamilyChanged: (callback) => {
+    ipcRenderer.on('font-family-changed', (e, font) => callback(font));
   },
   onDataChanged: (callback) => {
     ipcRenderer.on('data-changed', () => callback());
