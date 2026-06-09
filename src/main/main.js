@@ -588,6 +588,22 @@ function setupIPC() {
     if (win) win.minimize();
   });
 
+  ipcMain.handle('window:maximize', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+      if (win.isMaximized()) {
+        win.unmaximize();
+      } else {
+        win.maximize();
+      }
+    }
+  });
+
+  ipcMain.handle('window:isMaximized', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return win ? win.isMaximized() : false;
+  });
+
   ipcMain.handle('window:setScale', (e, newScale) => {
     const oldScale = windowScale;
     windowScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));

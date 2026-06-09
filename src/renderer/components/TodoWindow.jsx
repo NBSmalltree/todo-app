@@ -25,6 +25,20 @@ export default function TodoWindow() {
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
 
+  // Apply font family
+  const applyFontFamily = (font) => {
+    const fontMap = {
+      system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif",
+      sans: "'Helvetica Neue', Arial, 'Noto Sans SC', sans-serif",
+      serif: "Georgia, 'Noto Serif SC', serif",
+      mono: "'SF Mono', Monaco, 'Courier New', 'Noto Sans SC', monospace",
+      pingfang: "'PingFang SC', 'Helvetica Neue', Arial, sans-serif",
+      microsoft: "'Microsoft YaHei', 'Segoe UI', Arial, sans-serif",
+    };
+    const fontFamilyValue = fontMap[font] || fontMap.system;
+    document.documentElement.style.setProperty('--app-font-family', fontFamilyValue);
+  };
+
   // Load todos on mount
   useEffect(() => {
     loadTodos();
@@ -41,6 +55,11 @@ export default function TodoWindow() {
         if (data.todo_opacity != null) {
           const v = Number(data.todo_opacity);
           if (!isNaN(v) && v >= 0.2 && v <= 1) setOpacity(v);
+        }
+
+        // Apply font family
+        if (data.font_family) {
+          applyFontFamily(data.font_family);
         }
       } catch (e) { /* ignore */ }
     };

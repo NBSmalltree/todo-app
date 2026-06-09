@@ -31,6 +31,21 @@ function TabIcon({ type }) {
 
 export default function TrayView() {
   const [activeTab, setActiveTab] = useState('archive');
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  // Apply font family
+  const applyFontFamily = (font) => {
+    const fontMap = {
+      system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif",
+      sans: "'Helvetica Neue', Arial, 'Noto Sans SC', sans-serif",
+      serif: "Georgia, 'Noto Serif SC', serif",
+      mono: "'SF Mono', Monaco, 'Courier New', 'Noto Sans SC', monospace",
+      pingfang: "'PingFang SC', 'Helvetica Neue', Arial, sans-serif",
+      microsoft: "'Microsoft YaHei', 'Segoe UI', Arial, sans-serif",
+    };
+    const fontFamilyValue = fontMap[font] || fontMap.system;
+    document.documentElement.style.setProperty('--app-font-family', fontFamilyValue);
+  };
 
   // Load theme on mount, listen for changes
   useEffect(() => {
@@ -40,6 +55,11 @@ export default function TrayView() {
         if (data.theme && ['light', 'dark', 'eye-care'].includes(data.theme)) {
           document.documentElement.setAttribute('data-theme', data.theme);
         }
+
+        // Apply font family
+        if (data.font_family) {
+          applyFontFamily(data.font_family);
+        }
       } catch (e) { /* ignore */ }
     };
     loadTheme();
@@ -47,7 +67,17 @@ export default function TrayView() {
     electronAPI?.onThemeChanged?.((newTheme) => {
       document.documentElement.setAttribute('data-theme', newTheme);
     });
+
+    // Check initial maximized state
+    checkMaximizedState();
   }, []);
+
+  const checkMaximizedState = async () => {
+    try {
+      const maximized = await electronAPI?.isWindowMaximized?.();
+      setIsMaximized(maximized);
+    } catch (e) { /* ignore */ }
+  };
 
   const handleClose = () => {
     electronAPI?.closeWindow();
@@ -55,6 +85,12 @@ export default function TrayView() {
 
   const handleMinimize = () => {
     electronAPI?.minimizeWindow();
+  };
+
+  const handleMaximize = async () => {
+    await electronAPI?.maximizeWindow?.();
+    // Toggle the state
+    setIsMaximized(!isMaximized);
   };
 
   return (
@@ -77,6 +113,21 @@ export default function TrayView() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M5 12h14" />
             </svg>
+          </button>
+          <button
+            onClick={handleMaximize}
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200/60 text-gray-400 hover:text-gray-600 transition-colors"
+            title={isMaximized ? "还原" : "最大化"}
+          >
+            {isMaximized ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" />
+              </svg>
+            )}
           </button>
           <button
             onClick={handleClose}

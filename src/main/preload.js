@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Window control
   closeWindow: () => ipcRenderer.invoke('window:close'),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
+  maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
+  isWindowMaximized: () => ipcRenderer.invoke('window:isMaximized'),
   setScale: (scale) => ipcRenderer.invoke('window:setScale', scale),
   getScale: () => ipcRenderer.invoke('window:getScale'),
   adjustScale: (delta) => ipcRenderer.invoke('window:adjustScale', delta),
