@@ -81,10 +81,40 @@ class EdgeManager {
   // Called when window moves
   onWindowMoved() {
     if (this.isAnimating) return;
-    if (this.state === 'HIDDEN' || this.state === 'HIDING') return;
 
     const bounds = this.win.getBounds();
     const detected = this.detectEdge(bounds);
+
+    // If window is hidden and user drags it away, un-snap
+    if (this.state === 'HIDDEN' || this.state === 'HIDING') {
+      // Check if window has moved significantly from snapped position
+      if (this.snappedDisplay && this.snappedEdge) {
+        const wa = this.snappedDisplay.workArea;
+        const threshold = this.snapThreshold * 2; // Use larger threshold for un-snap detection
+        let isAwayFromEdge = false;
+
+        switch (this.snappedEdge) {
+          case 'left':
+            isAwayFromEdge = bounds.x > wa.x + threshold;
+            break;
+          case 'right':
+            isAwayFromEdge = (bounds.x + bounds.width) < wa.x + wa.width - threshold;
+            break;
+          case 'top':
+            isAwayFromEdge = bounds.y > wa.y + threshold;
+            break;
+          case 'bottom':
+            isAwayFromEdge = (bounds.y + bounds.height) < wa.y + wa.height - threshold;
+            break;
+        }
+
+        if (isAwayFromEdge) {
+          this.unSnap();
+          return;
+        }
+      }
+      return;
+    }
 
     if (detected && this.state === 'FREE') {
       this.snappedDisplay = detected.display;
