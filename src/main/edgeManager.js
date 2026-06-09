@@ -394,17 +394,43 @@ class EdgeManager {
   animateTo(targetX, targetY, duration, callback) {
     // Validate parameters
     if (typeof targetX !== 'number' || typeof targetY !== 'number' ||
-        isNaN(targetX) || isNaN(targetY)) {
+        isNaN(targetX) || isNaN(targetY) ||
+        !isFinite(targetX) || !isFinite(targetY)) {
       console.error('[EdgeManager] Invalid animation target:', targetX, targetY);
       if (callback) callback();
       return;
     }
 
-    const startX = this.win.getPosition()[0];
-    const startY = this.win.getPosition()[1];
+    // Get current position with validation
+    const position = this.win.getPosition();
+    if (!Array.isArray(position) || position.length < 2) {
+      console.error('[EdgeManager] Invalid window position:', position);
+      if (callback) callback();
+      return;
+    }
+
+    const startX = position[0];
+    const startY = position[1];
+
+    // Validate start position
+    if (typeof startX !== 'number' || typeof startY !== 'number' ||
+        isNaN(startX) || isNaN(startY) ||
+        !isFinite(startX) || !isFinite(startY)) {
+      console.error('[EdgeManager] Invalid start position:', startX, startY);
+      if (callback) callback();
+      return;
+    }
+
     const startTime = Date.now();
 
     const animate = () => {
+      // Check if window is still valid
+      if (!this.win || this.win.isDestroyed()) {
+        console.error('[EdgeManager] Window destroyed during animation');
+        if (callback) callback();
+        return;
+      }
+
       const elapsed = Date.now() - startTime;
       const t = Math.min(1, elapsed / duration);
       const ease = t * (2 - t); // easeOutQuad
@@ -413,13 +439,21 @@ class EdgeManager {
       const curY = Math.round(startY + (targetY - startY) * ease);
 
       // Ensure values are valid integers
-      if (isNaN(curX) || isNaN(curY)) {
-        console.error('[EdgeManager] Animation produced NaN values');
+      if (typeof curX !== 'number' || typeof curY !== 'number' ||
+          isNaN(curX) || isNaN(curY) ||
+          !isFinite(curX) || !isFinite(curY)) {
+        console.error('[EdgeManager] Animation produced invalid values:', curX, curY);
         if (callback) callback();
         return;
       }
 
-      this.win.setPosition(curX, curY, false);
+      try {
+        this.win.setPosition(curX, curY, false);
+      } catch (err) {
+        console.error('[EdgeManager] setPosition error:', err.message, 'curX:', curX, 'curY:', curY);
+        if (callback) callback();
+        return;
+      }
 
       if (t < 1) {
         setTimeout(animate, 16);
