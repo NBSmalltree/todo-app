@@ -17,6 +17,7 @@ export default function TodoWindow() {
   const [dragOverId, setDragOverId] = useState(null); // item being hovered over
   const [editingId, setEditingId] = useState(null);    // 正在编辑的 todo id
   const [editText, setEditText] = useState('');          // 编辑中的文本
+  const [edgeState, setEdgeState] = useState({ snapped: false, edge: null, hidden: false });
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const editInputRef = useRef(null);
@@ -57,6 +58,11 @@ export default function TodoWindow() {
     // Listen for opacity changes from settings
     electronAPI?.onOpacityChanged?.((v) => {
       setOpacity(v);
+    });
+
+    // Listen for edge state changes
+    electronAPI?.onEdgeStateChanged?.((state) => {
+      setEdgeState(state);
     });
   }, []);
 
@@ -361,7 +367,11 @@ export default function TodoWindow() {
 
   return (
     <div className="h-full overflow-hidden" style={{ opacity }}>
-      <div className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100" style={{ zoom: scale, transition: 'zoom 0.15s ease-out' }}>
+      <div className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 relative" style={{ zoom: scale, transition: 'zoom 0.15s ease-out' }}>
+      {/* Edge snap indicator */}
+      {edgeState.snapped && edgeState.edge && (
+        <div className={`snap-indicator ${edgeState.edge}`} />
+      )}
       {/* Title Bar - Draggable */}
       <div className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100">
         <div className="flex items-center gap-2">
@@ -372,6 +382,17 @@ export default function TodoWindow() {
           <span className="text-sm font-medium text-gray-600">待办清单</span>
         </div>
         <div className="flex items-center gap-1">
+          {edgeState.snapped && (
+            <button
+              onClick={() => electronAPI?.toggleEdgeHide()}
+              className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200/60 text-gray-400 hover:text-gray-600 transition-colors"
+              title="取消吸附"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2v6m0 0L9 5m3 3l3-3M12 22v-6m0 0l-3 3m3-3l3 3M2 12h6m0 0L5 9m3 3L5 15M22 12h-6m0 0l3-3m-3 3l3 3" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={handleOpenTray}
             className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200/60 text-gray-400 hover:text-gray-600 transition-colors"

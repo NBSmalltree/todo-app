@@ -156,6 +156,43 @@ input, textarea {
   transition: transform 0.1s ease;
 }
 
+/* Edge snap indicator */
+.snap-indicator {
+  position: absolute;
+  background: linear-gradient(to right, #38bdf8, #0ea5e9);
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+  z-index: 10;
+}
+
+.snap-indicator.left {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+
+.snap-indicator.right {
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+
+.snap-indicator.top {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
+.snap-indicator.bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
 /* ===== Dark Theme ===== */
 [data-theme="dark"] {
   color-scheme: dark;

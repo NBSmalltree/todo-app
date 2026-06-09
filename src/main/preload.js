@@ -41,6 +41,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Theme
   applyTheme: (theme) => ipcRenderer.invoke('window:applyTheme', theme),
 
+  // Edge management
+  toggleEdgeHide: () => ipcRenderer.invoke('edge:toggleHide'),
+  getEdgeSettings: () => ipcRenderer.invoke('edge:getSettings'),
+  saveEdgeSettings: (settings) => ipcRenderer.invoke('edge:saveSettings', settings),
+
   // Events
   onScaleChanged: (callback) => {
     ipcRenderer.on('scale-changed', (e, scale) => callback(scale));
@@ -56,5 +61,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onOpacityChanged: (callback) => {
     ipcRenderer.on('opacity-changed', (e, opacity) => callback(opacity));
+  },
+  onEdgeStateChanged: (callback) => {
+    ipcRenderer.on('edge:stateChanged', (e, state) => callback(state));
   },
 });

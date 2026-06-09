@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, dialog } = require('electron');
 const path = require('path');
 const Database = require('./database');
+const EdgeManager = require('./edgeManager');
 
 // Keep a global reference to prevent garbage collection
 let floatWindow = null;
@@ -8,6 +9,7 @@ let trayWindow = null;
 let settingsWindow = null;
 let tray = null;
 let db = null;
+let edgeManager = null;
 
 // Store window scale state
 let windowScale = 1.0;
@@ -95,7 +97,40 @@ function createFloatWindow() {
     floatWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   }
 
+  // Initialize edge manager
+  edgeManager = new EdgeManager(floatWindow);
+  edgeManager.loadSettings(db);
+
+  // Add move and resize event listeners for edge detection
+  floatWindow.on('move', () => {
+    if (edgeManager) edgeManager.onWindowMoved();
+  });
+
+  floatWindow.on('resize', () => {
+    if (edgeManager) edgeManager.onWindowResized();
+  });
+
+  // Restore edge state if saved
+  try {
+    const settings = db.getSettings();
+    if (settings.edge_state) {
+      const edgeState = typeof settings.edge_state === 'string'
+        ? JSON.parse(settings.edge_state)
+        : settings.edge_state;
+      if (edgeState && edgeState.edge) {
+        // Delay restore to ensure window is fully ready
+        setTimeout(() => {
+          if (edgeManager) edgeManager.restoreState(edgeState);
+        }, 500);
+      }
+    }
+  } catch (e) { /* ignore */ }
+
   floatWindow.on('closed', () => {
+    if (edgeManager) {
+      edgeManager.destroy();
+      edgeManager = null;
+    }
     floatWindow = null;
   });
 
@@ -197,7 +232,12 @@ function createTray() {
       label: '待办清单',
       click: () => {
         if (floatWindow) {
-          floatWindow.show();
+          // If window is hidden by edge manager, show it
+          if (edgeManager && edgeManager.state === 'HIDDEN') {
+            edgeManager.showWindow();
+          } else {
+            floatWindow.show();
+          }
           floatWindow.focus();
         }
       },
@@ -427,6 +467,20 @@ function setupIPC() {
     }
   });
 
+  // Edge management
+  ipcMain.handle('edge:toggleHide', () => {
+    if (edgeManager) edgeManager.toggleHide();
+  });
+
+  ipcMain.handle('edge:getSettings', () => {
+    if (edgeManager) return edgeManager.getSettings();
+    return { edge_snap_enabled: true, edge_hide_delay: 3000, edge_snap_threshold: 20 };
+  });
+
+  ipcMain.handle('edge:saveSettings', (e, settings) => {
+    if (edgeManager) edgeManager.saveSettings(db, settings);
+  });
+
   // LLM categorization
   ipcMain.handle('llm:categorize', async (e, text) => {
     try {
@@ -621,13 +675,29 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   app.isQuitting = true;
-  // Save window bounds
+  // Save window bounds and edge state
   if (floatWindow && !floatWindow.isDestroyed()) {
     try {
       const [width, height] = floatWindow.getSize();
       const [x, y] = floatWindow.getPosition();
-      db.saveSettings({ window_bounds: JSON.stringify({ x, y, width, height }) });
+      const settingsToSave = { window_bounds: JSON.stringify({ x, y, width, height }) };
+
+      // Save edge state if snapped
+      if (edgeManager) {
+        const edgeState = edgeManager.getState();
+        if (edgeState) {
+          settingsToSave.edge_state = JSON.stringify(edgeState);
+        } else {
+          settingsToSave.edge_state = null;
+        }
+      }
+
+      db.saveSettings(settingsToSave);
     } catch (e) { /* ignore */ }
+  }
+  if (edgeManager) {
+    edgeManager.destroy();
+    edgeManager = null;
   }
   if (db) db.close();
 });

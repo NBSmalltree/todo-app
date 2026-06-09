@@ -43,6 +43,11 @@ export default function Settings() {
   });
   const [theme, setTheme] = useState('light');
   const [opacity, setOpacity] = useState(0.92);
+  const [edgeSettings, setEdgeSettings] = useState({
+    edge_snap_enabled: true,
+    edge_hide_delay: 3000,
+    edge_snap_threshold: 20,
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -73,6 +78,12 @@ export default function Settings() {
         const v = Number(data.todo_opacity);
         if (!isNaN(v) && v >= 0.2 && v <= 1) setOpacity(v);
       }
+
+      // Load edge settings
+      try {
+        const edgeData = await electronAPI.getEdgeSettings();
+        setEdgeSettings(edgeData);
+      } catch (e) { /* ignore */ }
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
@@ -87,6 +98,10 @@ export default function Settings() {
         theme,
         todo_opacity: opacity,
       });
+
+      // Save edge settings
+      await electronAPI.saveEdgeSettings(edgeSettings);
+
       setSaveMessage('设置已保存');
       setTimeout(() => setSaveMessage(''), 2000);
     } catch (error) {
@@ -95,6 +110,10 @@ export default function Settings() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleEdgeSettingChange = (key, value) => {
+    setEdgeSettings((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleChange = (key, value) => {
@@ -265,6 +284,78 @@ export default function Settings() {
                   className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
                 />
                 <p className="text-xs text-gray-400 mt-1">使用的模型名称，如 gpt-4o-mini、gpt-4、claude-3-haiku 等</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Edge Snap Settings */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">窗口吸附设置</h2>
+            <p className="text-sm text-gray-500 mb-4">配置窗口靠近屏幕边缘时的自动吸附行为</p>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+              {/* Enable/Disable Toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">启用边缘吸附</label>
+                  <p className="text-xs text-gray-400 mt-1">窗口靠近屏幕边缘时自动吸附并可自动隐藏</p>
+                </div>
+                <button
+                  onClick={() => handleEdgeSettingChange('edge_snap_enabled', !edgeSettings.edge_snap_enabled)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    edgeSettings.edge_snap_enabled ? 'bg-sky-500' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      edgeSettings.edge_snap_enabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Hide Delay Slider */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  自动隐藏延迟: {edgeSettings.edge_hide_delay / 1000}秒
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="1000"
+                    max="10000"
+                    step="500"
+                    value={edgeSettings.edge_hide_delay}
+                    onChange={(e) => handleEdgeSettingChange('edge_hide_delay', Number(e.target.value))}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                  />
+                  <span className="text-sm text-gray-600 w-16 text-right">
+                    {edgeSettings.edge_hide_delay / 1000}秒
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">窗口吸附后多久自动隐藏到屏幕边缘</p>
+              </div>
+
+              {/* Snap Threshold Slider */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  吸附灵敏度: {edgeSettings.edge_snap_threshold}px
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="5"
+                    max="50"
+                    step="5"
+                    value={edgeSettings.edge_snap_threshold}
+                    onChange={(e) => handleEdgeSettingChange('edge_snap_threshold', Number(e.target.value))}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                  />
+                  <span className="text-sm text-gray-600 w-12 text-right">
+                    {edgeSettings.edge_snap_threshold}px
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">距离屏幕边缘多近时触发吸附</p>
               </div>
             </div>
           </div>
