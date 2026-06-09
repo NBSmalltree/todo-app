@@ -82,6 +82,11 @@ class TodoDatabase {
     return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
   }
 
+  updateText(id, text) {
+    this.db.prepare('UPDATE todos SET text = ? WHERE id = ?').run(text, id);
+    return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+  }
+
   toggleTodo(id) {
     const todo = this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
     if (!todo) return null;

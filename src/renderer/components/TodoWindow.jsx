@@ -15,8 +15,11 @@ export default function TodoWindow() {
   const [checkPulseIds, setCheckPulseIds] = useState(new Set());
   const [dragId, setDragId] = useState(null);       // item being dragged
   const [dragOverId, setDragOverId] = useState(null); // item being hovered over
+  const [editingId, setEditingId] = useState(null);    // 正在编辑的 todo id
+  const [editText, setEditText] = useState('');          // 编辑中的文本
   const inputRef = useRef(null);
   const listRef = useRef(null);
+  const editInputRef = useRef(null);
   const isComposingRef = useRef(false); // Track IME composition state
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
@@ -257,6 +260,45 @@ export default function TodoWindow() {
     }
   };
 
+  const handleDoubleClick = (e, todo) => {
+    e.stopPropagation();           // 阻止事件冒泡到 drag handler
+    e.preventDefault();            // 防止双击选中文本
+    setEditingId(todo.id);
+    setEditText(todo.text);
+  };
+
+  const handleSaveEdit = async (id) => {
+    const trimmed = editText.trim();
+    if (!trimmed) {
+      // 空文本则取消编辑，不做保存
+      handleCancelEdit();
+      return;
+    }
+    try {
+      await electronAPI.updateText(id, trimmed);
+      setEditingId(null);
+      setEditText('');
+      await loadTodos();
+    } catch (error) {
+      console.error('Failed to update text:', error);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditText('');
+  };
+
+  const handleEditKeyDown = (e, id) => {
+    if (e.key === 'Enter' && !isComposingRef.current) {
+      e.preventDefault();
+      handleSaveEdit(id);
+    }
+    if (e.key === 'Escape') {
+      handleCancelEdit();
+    }
+  };
+
   const handleKeyDown = (e) => {
     // Don't submit while IME composition is active (e.g. typing Chinese)
     if (e.key === 'Enter' && !isComposingRef.current) {
@@ -388,7 +430,7 @@ export default function TodoWindow() {
               <div className="h-0.5 bg-sky-400 rounded-full mx-2 transition-all" />
             )}
             <div
-              draggable
+              draggable={editingId !== todo.id}
               onDragStart={(e) => handleDragStart(e, todo.id)}
               onDragOver={(e) => handleDragOver(e, todo.id)}
               onDrop={(e) => handleDrop(e, todo.id)}
@@ -414,7 +456,28 @@ export default function TodoWindow() {
               >
                 {/* Empty circle for uncompleted */}
               </button>
-              <span className="flex-1 text-sm text-gray-700 truncate">{todo.text}</span>
+              {editingId === todo.id ? (
+                <input
+                  ref={editInputRef}
+                  type="text"
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => handleEditKeyDown(e, todo.id)}
+                  onBlur={() => handleSaveEdit(todo.id)}
+                  onCompositionStart={() => { isComposingRef.current = true; }}
+                  onCompositionEnd={() => { isComposingRef.current = false; }}
+                  autoFocus
+                  className="flex-1 min-w-0 px-1.5 py-0.5 text-sm bg-gray-50 rounded border border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200 transition-all"
+                />
+              ) : (
+                <span
+                  onDoubleClick={(e) => handleDoubleClick(e, todo)}
+                  className="flex-1 text-sm text-gray-700 truncate cursor-default"
+                  title="双击编辑"
+                >
+                  {todo.text}
+                </span>
+              )}
               <button
                 onClick={() => handleDelete(todo.id)}
                 className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
@@ -452,7 +515,28 @@ export default function TodoWindow() {
                 <path d="M5 13l4 4L19 7" />
               </svg>
             </button>
-            <span className="flex-1 text-sm text-gray-400 line-through truncate">{todo.text}</span>
+            {editingId === todo.id ? (
+              <input
+                ref={editInputRef}
+                type="text"
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => handleEditKeyDown(e, todo.id)}
+                onBlur={() => handleSaveEdit(todo.id)}
+                onCompositionStart={() => { isComposingRef.current = true; }}
+                onCompositionEnd={() => { isComposingRef.current = false; }}
+                autoFocus
+                className="flex-1 min-w-0 px-1.5 py-0.5 text-sm bg-gray-50 rounded border border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200 transition-all"
+              />
+            ) : (
+              <span
+                onDoubleClick={(e) => handleDoubleClick(e, todo)}
+                className="flex-1 text-sm text-gray-400 line-through truncate cursor-default"
+                title="双击编辑"
+              >
+                {todo.text}
+              </span>
+            )}
             <button
               onClick={() => handleDelete(todo.id)}
               className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"

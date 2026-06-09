@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCategories: () => ipcRenderer.invoke('db:getCategories'),
   reorder: (orders) => ipcRenderer.invoke('db:reorder', orders),
   updateColor: (id, color) => ipcRenderer.invoke('db:updateColor', id, color),
+  updateText: (id, text) => ipcRenderer.invoke('db:updateText', id, text),
   getWorkAnalysis: (period) => ipcRenderer.invoke('db:getWorkAnalysis', period),
   getSettings: () => ipcRenderer.invoke('db:getSettings'),
   saveSettings: (settings) => ipcRenderer.invoke('db:saveSettings', settings),
