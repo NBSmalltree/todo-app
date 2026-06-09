@@ -580,13 +580,28 @@ function setupIPC() {
   });
 }
 
-// App lifecycle
-app.whenReady().then(() => {
-  db = new Database();
-  setupIPC();
-  createFloatWindow();
-  createTray();
-});
+// Single instance lock - prevent multiple instances (especially on Windows)
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // When a second instance is launched, activate the existing window
+    if (floatWindow && !floatWindow.isDestroyed()) {
+      if (!floatWindow.isVisible()) floatWindow.show();
+      floatWindow.focus();
+    }
+  });
+
+  // App lifecycle
+  app.whenReady().then(() => {
+    db = new Database();
+    setupIPC();
+    createFloatWindow();
+    createTray();
+  });
+}
 
 app.on('window-all-closed', () => {
   // Keep app running in tray
