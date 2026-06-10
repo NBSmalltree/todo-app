@@ -38,6 +38,7 @@ function ThemeIcon({ type }) {
 export default function Settings() {
   const [settings, setSettings] = useState({
     api_key: '',
+    api_format: 'openai',
     base_url: 'https://api.openai.com/v1',
     model: 'gpt-4o-mini',
   });
@@ -83,6 +84,7 @@ export default function Settings() {
     try {
       const data = await electronAPI.getSettings();
       if (data.api_key) setSettings((prev) => ({ ...prev, api_key: data.api_key }));
+      if (data.api_format) setSettings((prev) => ({ ...prev, api_format: data.api_format }));
       if (data.base_url) setSettings((prev) => ({ ...prev, base_url: data.base_url }));
       if (data.model) setSettings((prev) => ({ ...prev, model: data.model }));
       if (data.theme && ['light', 'dark', 'eye-care'].includes(data.theme)) setTheme(data.theme);
@@ -150,6 +152,13 @@ export default function Settings() {
 
   const handleChange = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleFormatChange = (format) => {
+    const defaults = format === 'anthropic'
+      ? { api_format: format, base_url: 'https://api.anthropic.com', model: 'claude-sonnet-4-20250514' }
+      : { api_format: format, base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini' };
+    setSettings((prev) => ({ ...prev, ...defaults }));
   };
 
   const handleClose = () => {
@@ -286,6 +295,22 @@ export default function Settings() {
             </p>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+              {/* API Format */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  API 格式
+                </label>
+                <select
+                  value={settings.api_format}
+                  onChange={(e) => handleFormatChange(e.target.value)}
+                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                >
+                  <option value="openai">OpenAI 格式（GPT、DeepSeek、智谱等）</option>
+                  <option value="anthropic">Anthropic 格式（Claude）</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">选择 API 提供商格式，切换后会自动填充默认地址和模型</p>
+              </div>
+
               {/* API Key */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -316,7 +341,7 @@ export default function Settings() {
                     )}
                   </button>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">输入你的 OpenAI 或兼容 API 的密钥</p>
+                <p className="text-xs text-gray-400 mt-1">输入你的 API 密钥</p>
               </div>
 
               {/* Base URL */}
@@ -331,7 +356,7 @@ export default function Settings() {
                   placeholder="https://api.openai.com/v1"
                   className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
                 />
-                <p className="text-xs text-gray-400 mt-1">API 的基础地址，支持 OpenAI 兼容的第三方服务</p>
+                <p className="text-xs text-gray-400 mt-1">API 的基础地址，切换格式后会自动填充</p>
               </div>
 
               {/* Model */}
@@ -446,7 +471,7 @@ export default function Settings() {
               <p>1. 填写 API Key 和相关配置后，点击"保存设置"</p>
               <p>2. 在历史归档页面，对未分类的任务点击"AI分类"按钮</p>
               <p>3. 系统会自动调用大模型判断任务类别并更新</p>
-              <p>4. 支持所有 OpenAI 兼容的 API 服务（如 DeepSeek、智谱等）</p>
+              <p>4. 支持 OpenAI 格式（GPT、DeepSeek、智谱等）和 Anthropic 格式（Claude）</p>
             </div>
           </div>
 
@@ -471,8 +496,8 @@ export default function Settings() {
                 通义千问
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-sky-400 rounded-full" />
-                Claude (Anthropic)
+                <span className="w-2 h-2 bg-orange-400 rounded-full" />
+                Claude (Sonnet, Haiku)
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 bg-sky-400 rounded-full" />
