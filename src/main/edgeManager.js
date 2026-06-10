@@ -82,11 +82,6 @@ class EdgeManager {
 
   // Called when window moves
   onWindowMoved() {
-    // Bug fix: cancel hide timer when user starts dragging a snapped window
-    if (this.state === 'SNAPPED') {
-      this.clearHideTimer();
-    }
-
     if (this.isAnimating) {
       // Bug fix: allow un-snap even during animation if user drags away
       if (this.state === 'SNAPPED' && this.snappedEdge) {
