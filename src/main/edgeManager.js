@@ -14,7 +14,9 @@ class EdgeManager {
     this.mouseLeaveInterval = null;
     this.savedBounds = null;
     this.isAnimating = false;
+    this.animationTimer = null;
     this.enabled = true;
+    this.notifySeq = 0;
   }
 
   // Load settings from database
@@ -80,7 +82,22 @@ class EdgeManager {
 
   // Called when window moves
   onWindowMoved() {
-    if (this.isAnimating) return;
+    // Bug fix: cancel hide timer when user starts dragging a snapped window
+    if (this.state === 'SNAPPED') {
+      this.clearHideTimer();
+    }
+
+    if (this.isAnimating) {
+      // Bug fix: allow un-snap even during animation if user drags away
+      if (this.state === 'SNAPPED' && this.snappedEdge) {
+        const bounds = this.win.getBounds();
+        if (this.isAwayFromSnapEdge(bounds)) {
+          this.cancelAnimation();
+          this.unSnap();
+        }
+      }
+      return;
+    }
 
     const bounds = this.win.getBounds();
     const detected = this.detectEdge(bounds);
@@ -336,6 +353,33 @@ class EdgeManager {
     }
   }
 
+  // Cancel running animation
+  cancelAnimation() {
+    if (this.animationTimer) {
+      clearTimeout(this.animationTimer);
+      this.animationTimer = null;
+    }
+    this.isAnimating = false;
+  }
+
+  // Check if window has moved away from current snap edge
+  isAwayFromSnapEdge(bounds) {
+    if (!this.snappedDisplay || !this.snappedEdge) return false;
+    const wa = this.snappedDisplay.workArea;
+    const threshold = this.snapThreshold * 1.5;
+    switch (this.snappedEdge) {
+      case 'left':
+        return bounds.x > wa.x + threshold;
+      case 'right':
+        return (bounds.x + bounds.width) < wa.x + wa.width - threshold;
+      case 'top':
+        return bounds.y > wa.y + threshold;
+      case 'bottom':
+        return (bounds.y + bounds.height) < wa.y + wa.height - threshold;
+    }
+    return false;
+  }
+
   // Un-snap: restore to free state
   unSnap() {
     this.state = 'FREE';
@@ -486,7 +530,7 @@ class EdgeManager {
       }
 
       if (t < 1) {
-        setTimeout(animate, 16);
+        this.animationTimer = setTimeout(animate, 16);
       } else {
         if (callback) callback();
       }
@@ -496,8 +540,10 @@ class EdgeManager {
 
   // Notify renderer of state change
   notifyRenderer() {
+    this.notifySeq++;
     if (this.win && !this.win.isDestroyed()) {
       this.win.webContents.send('edge:stateChanged', {
+        seq: this.notifySeq,
         snapped: this.state === 'SNAPPED' || this.state === 'HIDDEN',
         edge: this.snappedEdge,
         hidden: this.state === 'HIDDEN',
@@ -562,6 +608,7 @@ class EdgeManager {
 
   // Cleanup
   destroy() {
+    this.cancelAnimation();
     this.clearHideTimer();
     this.stopMousePolling();
     this.stopMouseLeaveWatcher();

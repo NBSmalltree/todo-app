@@ -22,6 +22,7 @@ export default function TodoWindow() {
   const listRef = useRef(null);
   const editInputRef = useRef(null);
   const isComposingRef = useRef(false); // Track IME composition state
+  const edgeSeqRef = useRef(0); // Track edge notification ordering
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
 
@@ -84,9 +85,12 @@ export default function TodoWindow() {
       applyFontFamily(font);
     });
 
-    // Listen for edge state changes
+    // Listen for edge state changes (ordered by seq to avoid stale notifications)
     electronAPI?.onEdgeStateChanged?.((state) => {
-      setEdgeState(state);
+      if ((state.seq || 0) >= edgeSeqRef.current) {
+        edgeSeqRef.current = state.seq || 0;
+        setEdgeState(state);
+      }
     });
   }, []);
 
