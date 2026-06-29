@@ -27,19 +27,26 @@ function createFloatWindow() {
   let bounds = { x: 100, y: 100, width: BASE_WIDTH, height: BASE_HEIGHT };
   let savedEdgeState = null;
   try {
-    const settings = db.getSettings();
-    if (settings.window_bounds) {
-      const saved = typeof settings.window_bounds === 'string'
-        ? JSON.parse(settings.window_bounds)
-        : settings.window_bounds;
-      bounds = { ...bounds, ...saved };
+    if (!db) {
+      console.warn('[Main] Database not initialized, using default bounds');
+    } else {
+      const settings = db.getSettings();
+      if (settings.window_bounds) {
+        const saved = typeof settings.window_bounds === 'string'
+          ? JSON.parse(settings.window_bounds)
+          : settings.window_bounds;
+        bounds = { ...bounds, ...saved };
+      }
+      if (settings.edge_state) {
+        savedEdgeState = typeof settings.edge_state === 'string'
+          ? JSON.parse(settings.edge_state)
+          : settings.edge_state;
+      }
     }
-    if (settings.edge_state) {
-      savedEdgeState = typeof settings.edge_state === 'string'
-        ? JSON.parse(settings.edge_state)
-        : settings.edge_state;
-    }
-  } catch (e) { /* use defaults */ }
+  } catch (e) {
+    console.error('[Main] Failed to load settings:', e.message);
+    /* use defaults */
+  }
 
   // Validate bounds are within visible screen area
   const displays = screen.getAllDisplays();
@@ -736,6 +743,11 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (!floatWindow) {
+    // Ensure db is initialized
+    if (!db) {
+      console.warn('[Main] Database not initialized on activate, initializing now...');
+      db = new Database();
+    }
     createFloatWindow();
   }
 });

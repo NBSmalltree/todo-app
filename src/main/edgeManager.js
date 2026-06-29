@@ -21,10 +21,18 @@ class EdgeManager {
 
   // Load settings from database
   loadSettings(db) {
-    const settings = db.getSettings();
-    this.enabled = settings.edge_snap_enabled !== false; // default true
-    this.hideDelay = settings.edge_hide_delay || 3000;
-    this.snapThreshold = settings.edge_snap_threshold || 20;
+    if (!db) {
+      console.warn('[EdgeManager] Database not initialized, using default settings');
+      return;
+    }
+    try {
+      const settings = db.getSettings();
+      this.enabled = settings.edge_snap_enabled !== false; // default true
+      this.hideDelay = settings.edge_hide_delay || 3000;
+      this.snapThreshold = settings.edge_snap_threshold || 20;
+    } catch (err) {
+      console.error('[EdgeManager] Failed to load settings:', err.message);
+    }
   }
 
   // Save settings to database
