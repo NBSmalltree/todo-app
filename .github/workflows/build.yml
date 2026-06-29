@@ -26,7 +26,7 @@ jobs:
         run: npm run build:renderer
 
       - name: Build Electron app (ARM64 + x64)
-        run: npx electron-builder --mac --arch arm64,x64 --publish never
+        run: npx electron-builder --mac --arm64 --x64 --publish never
 
       - name: Upload Mac artifacts
         uses: actions/upload-artifact@v4
