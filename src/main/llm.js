@@ -112,6 +112,33 @@ class LLMHelper {
       return `分析生成失败：${error.message}`;
     }
   }
+
+  async test() {
+    try {
+      if (this.apiFormat === 'anthropic') {
+        const response = await this.anthropic.messages.create({
+          model: this.model,
+          max_tokens: 10,
+          messages: [{ role: 'user', content: '请回复"OK"' }],
+        });
+        const text = response.content[0]?.text || '';
+        return { success: true, message: `连接成功！模型响应：${text.slice(0, 50)}` };
+      } else {
+        const response = await this.openai.chat.completions.create({
+          model: this.model,
+          messages: [{ role: 'user', content: '请回复"OK"' }],
+          max_tokens: 10,
+        });
+        const text = response.choices[0]?.message?.content || '';
+        return { success: true, message: `连接成功！模型响应：${text.slice(0, 50)}` };
+      }
+    } catch (error) {
+      let errorMsg = error.message;
+      if (error.status) errorMsg = `HTTP ${error.status} - ${errorMsg}`;
+      if (error.error?.message) errorMsg = error.error.message;
+      return { success: false, error: errorMsg };
+    }
+  }
 }
 
 module.exports = LLMHelper;

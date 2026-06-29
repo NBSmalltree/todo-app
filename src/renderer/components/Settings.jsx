@@ -55,6 +55,8 @@ export default function Settings() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
   const [scale, setScale] = useState(1);
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
@@ -188,6 +190,26 @@ export default function Settings() {
       ? { api_format: format, base_url: 'https://api.anthropic.com', model: 'claude-sonnet-4-20250514' }
       : { api_format: format, base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini' };
     setSettings((prev) => ({ ...prev, ...defaults }));
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const result = await electronAPI.testLLM({
+        api_format: settings.api_format,
+        api_key: settings.api_key,
+        base_url: settings.base_url,
+        model: settings.model,
+        categorize_max_tokens: settings.categorize_max_tokens,
+        analyze_max_tokens: settings.analyze_max_tokens,
+      });
+      setTestResult(result);
+    } catch (error) {
+      setTestResult({ success: false, error: error.message });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const handleClose = () => {
@@ -439,6 +461,22 @@ export default function Settings() {
                   className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
                 />
                 <p className="text-xs text-gray-400 mt-1">AI 工作分析时的最大 Token 数（1024-16384）</p>
+              </div>
+
+              {/* Test Connection */}
+              <div className="pt-4 border-t border-gray-100">
+                <button
+                  onClick={handleTest}
+                  disabled={testing || !settings.api_key}
+                  className="px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {testing ? '测试中...' : '测试连接'}
+                </button>
+                {testResult && (
+                  <span className={`ml-3 text-sm ${testResult.success ? 'text-green-600' : 'text-red-500'}`}>
+                    {testResult.success ? testResult.message : `连接失败：${testResult.error}`}
+                  </span>
+                )}
               </div>
             </div>
           </div>

@@ -465,6 +465,20 @@ function setupIPC() {
     }
   });
 
+  // LLM connection test
+  ipcMain.handle('llm:test', async (e, settings) => {
+    try {
+      const LLMHelper = require('./llm');
+      if (!settings || !settings.api_key) {
+        return { success: false, error: '请先填写 API Key' };
+      }
+      const llm = new LLMHelper(settings);
+      return await llm.test();
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
   // Database backup and restore
   ipcMain.handle('app:backupDatabase', async (event) => {
     try {
