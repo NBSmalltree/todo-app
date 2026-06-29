@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, dialog, globalShortcut } = require('electron');
 const path = require('path');
 const Database = require('./database');
 const EdgeManager = require('./edgeManager');
@@ -25,6 +25,7 @@ function isDev() {
 function createFloatWindow() {
   // Read saved window bounds, fallback to defaults
   let bounds = { x: 100, y: 100, width: BASE_WIDTH, height: BASE_HEIGHT };
+  let savedEdgeState = null;
   try {
     const settings = db.getSettings();
     if (settings.window_bounds) {
@@ -32,6 +33,11 @@ function createFloatWindow() {
         ? JSON.parse(settings.window_bounds)
         : settings.window_bounds;
       bounds = { ...bounds, ...saved };
+    }
+    if (settings.edge_state) {
+      savedEdgeState = typeof settings.edge_state === 'string'
+        ? JSON.parse(settings.edge_state)
+        : settings.edge_state;
     }
   } catch (e) { /* use defaults */ }
 
@@ -110,21 +116,12 @@ function createFloatWindow() {
     if (edgeManager) edgeManager.onWindowResized();
   });
 
-  // Restore edge state if saved
-  try {
-    const settings = db.getSettings();
-    if (settings.edge_state) {
-      const edgeState = typeof settings.edge_state === 'string'
-        ? JSON.parse(settings.edge_state)
-        : settings.edge_state;
-      if (edgeState && edgeState.edge) {
-        // Delay restore to ensure window is fully ready
-        setTimeout(() => {
-          if (edgeManager) edgeManager.restoreState(edgeState);
-        }, 500);
-      }
-    }
-  } catch (e) { /* ignore */ }
+  // Restore edge state after renderer is fully ready
+  if (savedEdgeState && savedEdgeState.edge) {
+    floatWindow.webContents.on('did-finish-load', () => {
+      if (edgeManager) edgeManager.restoreState(savedEdgeState);
+    });
+  }
 
   floatWindow.on('closed', () => {
     if (edgeManager) {
@@ -218,14 +215,16 @@ function createSettingsWindow() {
 }
 
 function createTray() {
-  const iconSize = process.platform === 'darwin' ? 22 : 16;
-  const trayIcon = createTrayIcon(iconSize);
-  tray = new Tray(trayIcon);
+  // Load tray icon from PNG files (Electron auto-picks @2x/@3x version on macOS Retina)
+  const iconPath = path.join(__dirname, '../../assets/tray-icon.png');
+  let trayIcon = nativeImage.createFromPath(iconPath);
 
   // On macOS, mark as template image so it adapts to light/dark menu bar
   if (process.platform === 'darwin') {
     trayIcon.setTemplateImage(true);
   }
+
+  tray = new Tray(trayIcon);
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -277,122 +276,6 @@ function createTray() {
   });
 }
 
-function createTrayIcon(size) {
-  const zlib = require('zlib');
-
-  // Create a checkmark icon as PNG
-  const width = size;
-  const height = size;
-
-  // RGBA pixel data
-  const pixels = Buffer.alloc(width * height * 4, 0);
-
-  const setPixel = (x, y, r, g, b, a) => {
-    if (x < 0 || x >= width || y < 0 || y >= height) return;
-    const idx = (y * width + x) * 4;
-    pixels[idx] = r;
-    pixels[idx + 1] = g;
-    pixels[idx + 2] = b;
-    pixels[idx + 3] = a;
-  };
-
-  // Scale coordinates relative to icon size
-  const s = size / 16;
-  const col = [6, 168, 233]; // sky-500
-
-  // Draw rounded rectangle border
-  const drawRoundRect = (x0, y0, x1, y1, radius) => {
-    for (let x = x0; x <= x1; x++) {
-      for (let y = y0; y <= y1; y++) {
-        const inCorner =
-          (x < x0 + radius && y < y0 + radius && Math.sqrt((x - x0 - radius) ** 2 + (y - y0 - radius) ** 2) > radius) ||
-          (x > x1 - radius && y < y0 + radius && Math.sqrt((x - x1 + radius) ** 2 + (y - y0 - radius) ** 2) > radius) ||
-          (x < x0 + radius && y > y1 - radius && Math.sqrt((x - x0 - radius) ** 2 + (y - y1 + radius) ** 2) > radius) ||
-          (x > x1 - radius && y > y1 - radius && Math.sqrt((x - x1 + radius) ** 2 + (y - y1 + radius) ** 2) > radius);
-        if (inCorner) continue;
-        const onBorder = x === x0 || x === x1 || y === y0 || y === y1;
-        if (onBorder) {
-          setPixel(x, y, ...col, 255);
-        }
-      }
-    }
-  };
-
-  drawRoundRect(Math.round(1 * s), Math.round(1 * s), Math.round(14 * s), Math.round(14 * s), Math.round(2 * s));
-
-  // Draw checkmark
-  const drawLine = (x0, y0, x1, y1) => {
-    const dx = Math.abs(x1 - x0);
-    const dy = Math.abs(y1 - y0);
-    const sx = x0 < x1 ? 1 : -1;
-    const sy = y0 < y1 ? 1 : -1;
-    let err = dx - dy;
-    let x = x0, y = y0;
-    while (true) {
-      setPixel(x, y, ...col, 255);
-      if (x === x1 && y === y1) break;
-      const e2 = 2 * err;
-      if (e2 > -dy) { err -= dy; x += sx; }
-      if (e2 < dx) { err += dx; y += sy; }
-    }
-  };
-
-  drawLine(Math.round(4 * s), Math.round(8 * s), Math.round(7 * s), Math.round(11 * s));
-  drawLine(Math.round(7 * s), Math.round(11 * s), Math.round(12 * s), Math.round(4 * s));
-
-  // Build PNG
-  const png = buildPNG(width, height, pixels, zlib);
-  return nativeImage.createFromBuffer(png);
-
-  function buildPNG(w, h, rgba, zlibMod) {
-    const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-
-    const crc32 = (buf) => {
-      let crc = 0xffffffff;
-      for (let i = 0; i < buf.length; i++) {
-        crc ^= buf[i];
-        for (let j = 0; j < 8; j++) {
-          crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-        }
-      }
-      return (crc ^ 0xffffffff) >>> 0;
-    };
-
-    const chunk = (type, data) => {
-      const len = Buffer.alloc(4);
-      len.writeUInt32BE(data.length);
-      const typeBuffer = Buffer.from(type);
-      const crcData = Buffer.concat([typeBuffer, data]);
-      const crcVal = Buffer.alloc(4);
-      crcVal.writeUInt32BE(crc32(crcData));
-      return Buffer.concat([len, typeBuffer, data, crcVal]);
-    };
-
-    // IHDR
-    const ihdr = Buffer.alloc(13);
-    ihdr.writeUInt32BE(w, 0);
-    ihdr.writeUInt32BE(h, 4);
-    ihdr[8] = 8; // bit depth
-    ihdr[9] = 6; // RGBA
-    ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
-
-    // IDAT - add filter byte (0) to each row
-    const rawData = Buffer.alloc(h * (1 + w * 4));
-    for (let y = 0; y < h; y++) {
-      rawData[y * (1 + w * 4)] = 0;
-      rgba.copy(rawData, y * (1 + w * 4) + 1, y * w * 4, (y + 1) * w * 4);
-    }
-    const compressed = zlibMod.deflateSync(rawData);
-
-    return Buffer.concat([
-      signature,
-      chunk('IHDR', ihdr),
-      chunk('IDAT', compressed),
-      chunk('IEND', Buffer.alloc(0)),
-    ]);
-  }
-}
-
 // Scale helper: resize window proportionally from its current size, keeping center
 function applyScaleToWindow(oldScale, newScale) {
   if (!floatWindow) return;
@@ -409,37 +292,59 @@ function applyScaleToWindow(oldScale, newScale) {
   floatWindow.setPosition(newX, newY);
 }
 
+// Input validation helpers
+function isNonEmptyString(v, maxLen = 500) {
+  return typeof v === 'string' && v.trim().length > 0 && v.length <= maxLen;
+}
+function isPositiveInt(v) {
+  return typeof v === 'number' && Number.isInteger(v) && v > 0;
+}
+
 // IPC Handlers
 function setupIPC() {
   // Database operations
   ipcMain.handle('db:getTodos', () => db.getTodos());
-  ipcMain.handle('db:addTodo', (e, text) => db.addTodo(text));
-  ipcMain.handle('db:toggleTodo', (e, id) => db.toggleTodo(id));
-  ipcMain.handle('db:deleteTodo', (e, id) => db.deleteTodo(id));
+  ipcMain.handle('db:addTodo', (e, text) => {
+    if (!isNonEmptyString(text)) return { success: false, error: 'Invalid text' };
+    return db.addTodo(text.trim());
+  });
+  ipcMain.handle('db:toggleTodo', (e, id) => {
+    if (!isPositiveInt(id)) return null;
+    return db.toggleTodo(id);
+  });
+  ipcMain.handle('db:deleteTodo', (e, id) => {
+    if (!isPositiveInt(id)) return { success: false, error: 'Invalid id' };
+    return db.deleteTodo(id);
+  });
   ipcMain.handle('db:restoreTodo', (e, id) => {
+    if (!isPositiveInt(id)) return null;
     const result = db.restoreTodo(id);
-    // Notify float window to refresh
     if (floatWindow && !floatWindow.isDestroyed()) {
       floatWindow.webContents.send('data-changed');
     }
     return result;
   });
-  ipcMain.handle('db:archiveTodo', async (e, id) => {
+  ipcMain.handle('db:archiveTodo', (e, id) => {
+    if (!isPositiveInt(id)) return null;
     const todo = db.archiveTodo(id);
-    // Notify tray window to refresh
     if (trayWindow && !trayWindow.isDestroyed()) {
       trayWindow.webContents.send('data-changed');
     }
-    // Auto-categorize in background
     if (todo && !todo.category) {
       const settings = db.getSettings();
       if (settings.api_key) {
         const LLMHelper = require('./llm');
-        const llm = new LLMHelper(settings);
+        const llmSettings = {
+          api_format: 'openai',
+          model: 'gpt-4o-mini',
+          categorize_max_tokens: 2048,
+          analyze_max_tokens: 10000,
+          ...settings,
+        };
+        const llm = new LLMHelper(llmSettings);
         llm.categorize(todo.text).then((category) => {
           if (category) {
             db.updateCategory(id, category);
-            // Notify tray window again after categorization
             if (trayWindow && !trayWindow.isDestroyed()) {
               trayWindow.webContents.send('data-changed');
             }
@@ -449,16 +354,46 @@ function setupIPC() {
     }
     return todo;
   });
-  ipcMain.handle('db:getArchived', (e, filters) => db.getArchived(filters));
-  ipcMain.handle('db:updateNote', (e, id, note) => db.updateNote(id, note));
-  ipcMain.handle('db:updateCategory', (e, id, category) => db.updateCategory(id, category));
+  ipcMain.handle('db:getArchived', (e, filters) => {
+    if (filters && typeof filters !== 'object') return [];
+    return db.getArchived(filters || {});
+  });
+  ipcMain.handle('db:updateNote', (e, id, note) => {
+    if (!isPositiveInt(id)) return null;
+    return db.updateNote(id, typeof note === 'string' ? note : '');
+  });
+  ipcMain.handle('db:updateCategory', (e, id, category) => {
+    if (!isPositiveInt(id)) return null;
+    return db.updateCategory(id, typeof category === 'string' ? category : null);
+  });
+  ipcMain.handle('db:setDueDate', (e, id, dueDate) => {
+    if (!isPositiveInt(id)) return null;
+    // Validate dueDate format (YYYY-MM-DD) or allow null
+    if (dueDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return { success: false, error: 'Invalid date format' };
+    return db.setDueDate(id, dueDate);
+  });
   ipcMain.handle('db:getCategories', () => db.getCategories());
-  ipcMain.handle('db:reorder', (e, orders) => db.updateOrders(orders));
-  ipcMain.handle('db:updateColor', (e, id, color) => db.updateColor(id, color));
-  ipcMain.handle('db:updateText', (e, id, text) => db.updateText(id, text));
-  ipcMain.handle('db:getWorkAnalysis', (e, period) => db.getWorkAnalysis(period));
+  ipcMain.handle('db:reorder', (e, orders) => {
+    if (!Array.isArray(orders)) return { success: false, error: 'Invalid orders' };
+    return db.updateOrders(orders);
+  });
+  ipcMain.handle('db:updateColor', (e, id, color) => {
+    if (!isPositiveInt(id)) return null;
+    return db.updateColor(id, color);
+  });
+  ipcMain.handle('db:updateText', (e, id, text) => {
+    if (!isPositiveInt(id) || !isNonEmptyString(text)) return null;
+    return db.updateText(id, text.trim());
+  });
+  ipcMain.handle('db:getWorkAnalysis', (e, period) => {
+    const validPeriods = ['week', 'month', 'year'];
+    return db.getWorkAnalysis(validPeriods.includes(period) ? period : 'week');
+  });
   ipcMain.handle('db:getSettings', () => db.getSettings());
   ipcMain.handle('db:saveSettings', (e, settings) => {
+    if (!settings || typeof settings !== 'object') {
+      return { success: false, error: 'Invalid settings' };
+    }
     try {
       return db.saveSettings(settings);
     } catch (err) {
@@ -487,7 +422,14 @@ function setupIPC() {
       const LLMHelper = require('./llm');
       const settings = db.getSettings();
       if (!settings.api_key) return null;
-      const llm = new LLMHelper(settings);
+      const llmSettings = {
+        api_format: 'openai',
+        model: 'gpt-4o-mini',
+        categorize_max_tokens: 2048,
+        analyze_max_tokens: 10000,
+        ...settings,
+      };
+      const llm = new LLMHelper(llmSettings);
       return await llm.categorize(text);
     } catch (err) {
       console.error('[IPC] categorize error:', err.message);
@@ -501,11 +443,83 @@ function setupIPC() {
       const LLMHelper = require('./llm');
       const settings = db.getSettings();
       if (!settings.api_key) return null;
-      const llm = new LLMHelper(settings);
+      const llmSettings = {
+        api_format: 'openai',
+        model: 'gpt-4o-mini',
+        categorize_max_tokens: 2048,
+        analyze_max_tokens: 10000,
+        ...settings,
+      };
+      const llm = new LLMHelper(llmSettings);
       return await llm.analyzeWork(data);
     } catch (err) {
       console.error('[IPC] analyzeWork error:', err.message);
       return null;
+    }
+  });
+
+  // Database backup and restore
+  ipcMain.handle('app:backupDatabase', async (event) => {
+    try {
+      const fs = require('fs');
+      const dbPath = db.getDbPath();
+      const win = BrowserWindow.fromWebContents(event.sender);
+
+      const { filePath } = await dialog.showSaveDialog(win, {
+        title: '备份数据库',
+        defaultPath: `todo-app-backup-${new Date().toISOString().slice(0, 10)}.db`,
+        filters: [
+          { name: '数据库文件', extensions: ['db'] },
+          { name: '所有文件', extensions: ['*'] }
+        ]
+      });
+
+      if (!filePath) {
+        return { success: false, error: '用户取消' };
+      }
+
+      fs.copyFileSync(dbPath, filePath);
+      return { success: true, path: filePath };
+    } catch (err) {
+      console.error('[IPC] backupDatabase error:', err.message);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('app:restoreDatabase', async (event) => {
+    try {
+      const fs = require('fs');
+      const dbPath = db.getDbPath();
+      const win = BrowserWindow.fromWebContents(event.sender);
+
+      const { filePaths } = await dialog.showOpenDialog(win, {
+        title: '恢复数据库',
+        filters: [
+          { name: '数据库文件', extensions: ['db'] },
+          { name: '所有文件', extensions: ['*'] }
+        ],
+        properties: ['openFile']
+      });
+
+      if (!filePaths || filePaths.length === 0) {
+        return { success: false, error: '用户取消' };
+      }
+
+      const backupPath = filePaths[0];
+
+      // Close database connection
+      db.close();
+
+      // Copy backup file to current database location
+      fs.copyFileSync(backupPath, dbPath);
+
+      // Reopen database connection
+      db = new Database();
+
+      return { success: true };
+    } catch (err) {
+      console.error('[IPC] restoreDatabase error:', err.message);
+      return { success: false, error: err.message };
     }
   });
 
@@ -534,7 +548,7 @@ function setupIPC() {
 
       // Format CSV with BOM for Excel compatibility
       const BOM = '﻿';
-      const header = '任务内容,状态,类别,备注,创建时间,完成时间,归档时间\n';
+      const header = '任务内容,状态,截止日期,类别,备注,创建时间,完成时间,归档时间\n';
       const rows = items.map((item) => {
         const status = item.completed ? '已完成' : '待办';
         const category = item.category || '未分类';
@@ -543,6 +557,7 @@ function setupIPC() {
         return [
           escape(item.text),
           status,
+          item.due_date || '',
           escape(category),
           escape(item.note),
           item.created_at || '',
@@ -602,14 +617,6 @@ function setupIPC() {
   ipcMain.handle('window:isMaximized', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     return win ? win.isMaximized() : false;
-  });
-
-  ipcMain.handle('window:setScale', (e, newScale) => {
-    const oldScale = windowScale;
-    windowScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
-    if (floatWindow) {
-      applyScaleToWindow(oldScale, windowScale);
-    }
   });
 
   ipcMain.handle('window:getScale', () => windowScale);
@@ -692,6 +699,31 @@ if (!gotTheLock) {
     setupIPC();
     createFloatWindow();
     createTray();
+    
+    // Register global shortcut: Ctrl+Shift+T (Cmd+Shift+T on macOS)
+    const shortcut = process.platform === 'darwin' ? 'Cmd+Shift+T' : 'Ctrl+Shift+T';
+    globalShortcut.register(shortcut, () => {
+      if (floatWindow) {
+        if (floatWindow.isVisible() && !floatWindow.isMinimized()) {
+          // If window is visible and not minimized, hide it
+          if (edgeManager && edgeManager.state === 'HIDDEN') {
+            edgeManager.showWindow();
+          } else {
+            floatWindow.hide();
+          }
+        } else {
+          // If window is hidden or minimized, show and focus it
+          floatWindow.show();
+          floatWindow.focus();
+        }
+      }
+    });
+    console.log(`Global shortcut registered: ${shortcut}`);
+  });
+  
+  // Unregister global shortcuts when app quits
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
   });
 }
 

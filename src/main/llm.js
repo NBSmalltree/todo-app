@@ -5,6 +5,8 @@ class LLMHelper {
   constructor(settings = {}) {
     this.apiFormat = settings.api_format || 'openai';
     this.model = settings.model || (this.apiFormat === 'anthropic' ? 'claude-sonnet-4-20250514' : 'gpt-4o-mini');
+    this.categorizeMaxTokens = settings.categorize_max_tokens || 2048;
+    this.analyzeMaxTokens = settings.analyze_max_tokens || 10000;
 
     if (this.apiFormat === 'anthropic') {
       const baseURL = (settings.base_url || 'https://api.anthropic.com').replace(/\/+$/, '');
@@ -35,7 +37,7 @@ class LLMHelper {
       if (this.apiFormat === 'anthropic') {
         const response = await this.anthropic.messages.create({
           model: this.model,
-          max_tokens: 10000,
+          max_tokens: this.categorizeMaxTokens,
           temperature: 0.1,
           system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }],
@@ -49,7 +51,7 @@ class LLMHelper {
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ],
-          max_tokens: 10000,
+          max_tokens: this.categorizeMaxTokens,
           temperature: 0.1,
         });
         result = response.choices[0]?.message?.content?.trim() || '其他';
@@ -86,7 +88,7 @@ class LLMHelper {
       if (this.apiFormat === 'anthropic') {
         const response = await this.anthropic.messages.create({
           model: this.model,
-          max_tokens: 10000,
+          max_tokens: this.analyzeMaxTokens,
           temperature: 0.7,
           system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }],
@@ -99,7 +101,7 @@ class LLMHelper {
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ],
-          max_tokens: 10000,
+          max_tokens: this.analyzeMaxTokens,
           temperature: 0.7,
         });
         result = response.choices[0]?.message?.content?.trim() || '暂无分析';

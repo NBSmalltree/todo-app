@@ -30,19 +30,23 @@ export default function WorkAnalysis() {
       setIsLoading(false);
       // Trigger LLM analysis independently
       if (data && data.totalItems > 0) {
-        setLlmLoading(true);
-        try {
-          const tip = await electronAPI.analyzeWork(data);
-          setLlmTip(tip || '暂无分析');
-        } catch (e) {
-          setLlmTip('分析生成失败');
-        } finally {
-          setLlmLoading(false);
-        }
+        await generateAnalysis(data);
       }
     } catch (error) {
       console.error('Failed to load analysis:', error);
       setIsLoading(false);
+    }
+  };
+
+  const generateAnalysis = async (data) => {
+    setLlmLoading(true);
+    try {
+      const tip = await electronAPI.analyzeWork(data);
+      setLlmTip(tip || '暂无分析');
+    } catch (e) {
+      setLlmTip('分析生成失败');
+    } finally {
+      setLlmLoading(false);
     }
   };
 
@@ -236,7 +240,19 @@ export default function WorkAnalysis() {
               </div>
             ) : (
               <div className="text-sky-600 leading-relaxed prose prose-sm prose-sky max-w-none">
-                <ReactMarkdown>{llmTip}</ReactMarkdown>
+                {llmTip === '分析生成失败' ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-sky-600">分析生成失败</span>
+                    <button
+                      onClick={() => generateAnalysis(analysis)}
+                      className="px-3 py-1 text-xs text-sky-600 bg-sky-50 rounded hover:bg-sky-100 transition-colors"
+                    >
+                      重新生成
+                    </button>
+                  </div>
+                ) : (
+                  <ReactMarkdown>{llmTip}</ReactMarkdown>
+                )}
               </div>
             )}
           </div>

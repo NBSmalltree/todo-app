@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getArchived: (filters) => ipcRenderer.invoke('db:getArchived', filters),
   updateNote: (id, note) => ipcRenderer.invoke('db:updateNote', id, note),
   updateCategory: (id, category) => ipcRenderer.invoke('db:updateCategory', id, category),
+  setDueDate: (id, dueDate) => ipcRenderer.invoke('db:setDueDate', id, dueDate),
   getCategories: () => ipcRenderer.invoke('db:getCategories'),
   reorder: (orders) => ipcRenderer.invoke('db:reorder', orders),
   updateColor: (id, color) => ipcRenderer.invoke('db:updateColor', id, color),
@@ -29,7 +30,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
   isWindowMaximized: () => ipcRenderer.invoke('window:isMaximized'),
-  setScale: (scale) => ipcRenderer.invoke('window:setScale', scale),
   getScale: () => ipcRenderer.invoke('window:getScale'),
   adjustScale: (delta) => ipcRenderer.invoke('window:adjustScale', delta),
 
@@ -51,26 +51,44 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getEdgeSettings: () => ipcRenderer.invoke('edge:getSettings'),
   saveEdgeSettings: (settings) => ipcRenderer.invoke('edge:saveSettings', settings),
 
-  // Events
+  // App functions
+  backupDatabase: () => ipcRenderer.invoke('app:backupDatabase'),
+  restoreDatabase: () => ipcRenderer.invoke('app:restoreDatabase'),
+
+  // Events — each returns a cleanup function for useEffect teardown
   onScaleChanged: (callback) => {
-    ipcRenderer.on('scale-changed', (e, scale) => callback(scale));
+    const handler = (e, scale) => callback(scale);
+    ipcRenderer.on('scale-changed', handler);
+    return () => ipcRenderer.removeListener('scale-changed', handler);
   },
   onNavigate: (callback) => {
-    ipcRenderer.on('navigate', (e, route) => callback(route));
+    const handler = (e, route) => callback(route);
+    ipcRenderer.on('navigate', handler);
+    return () => ipcRenderer.removeListener('navigate', handler);
   },
   onThemeChanged: (callback) => {
-    ipcRenderer.on('theme-changed', (e, theme) => callback(theme));
+    const handler = (e, theme) => callback(theme);
+    ipcRenderer.on('theme-changed', handler);
+    return () => ipcRenderer.removeListener('theme-changed', handler);
   },
   onFontFamilyChanged: (callback) => {
-    ipcRenderer.on('font-family-changed', (e, font) => callback(font));
+    const handler = (e, font) => callback(font);
+    ipcRenderer.on('font-family-changed', handler);
+    return () => ipcRenderer.removeListener('font-family-changed', handler);
   },
   onDataChanged: (callback) => {
-    ipcRenderer.on('data-changed', () => callback());
+    const handler = () => callback();
+    ipcRenderer.on('data-changed', handler);
+    return () => ipcRenderer.removeListener('data-changed', handler);
   },
   onOpacityChanged: (callback) => {
-    ipcRenderer.on('opacity-changed', (e, opacity) => callback(opacity));
+    const handler = (e, opacity) => callback(opacity);
+    ipcRenderer.on('opacity-changed', handler);
+    return () => ipcRenderer.removeListener('opacity-changed', handler);
   },
   onEdgeStateChanged: (callback) => {
-    ipcRenderer.on('edge:stateChanged', (e, state) => callback(state));
+    const handler = (e, state) => callback(state);
+    ipcRenderer.on('edge:stateChanged', handler);
+    return () => ipcRenderer.removeListener('edge:stateChanged', handler);
   },
 });

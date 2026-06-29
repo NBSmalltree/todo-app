@@ -15,9 +15,15 @@ export default function TodoWindow() {
   const [checkPulseIds, setCheckPulseIds] = useState(new Set());
   const [dragId, setDragId] = useState(null);       // item being dragged
   const [dragOverId, setDragOverId] = useState(null); // item being hovered over
-  const [editingId, setEditingId] = useState(null);    // 正在编辑的 todo id
-  const [editText, setEditText] = useState('');          // 编辑中的文本
-  const [edgeState, setEdgeState] = useState({ snapped: false, edge: null, hidden: false });
+    const [editingId, setEditingId] = useState(null);    // 正在编辑的 todo id
+    const [editText, setEditText] = useState('');          // 编辑中的文本
+    const [datePickerId, setDatePickerId] = useState(null); // 正在设置截止日期的 todo id
+    const datePickerRef = useRef(null);                     // 日期选择器容器 ref
+    const [selectMode, setSelectMode] = useState(false);       // 批量选择模式
+    const [selectedIds, setSelectedIds] = useState(new Set());  // 已选中的 todo id
+    const [edgeState, setEdgeState] = useState({ snapped: false, edge: null, hidden: false });
+  const [searchText, setSearchText] = useState('');     // 搜索文本
+  const searchInputRef = useRef(null);                  // 搜索输入框 ref
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const editInputRef = useRef(null);
@@ -94,6 +100,13 @@ export default function TodoWindow() {
     });
   }, []);
 
+  // Focus edit input when editing starts (more reliable than autoFocus)
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus();
+    }
+  }, [editingId]);
+
   // Handle mouse wheel for scaling - attached to container for reliability
   useEffect(() => {
     const container = listRef.current?.parentElement;
@@ -116,12 +129,49 @@ export default function TodoWindow() {
     return () => container.removeEventListener('wheel', handleWheel);
   }, []);
 
+  // Apply scale to root font size so all rem-based Tailwind classes scale
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${scale * 16}px`;
+  }, [scale]);
+
   // Close context menu on click outside
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
   }, []);
+
+  // Close date picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (datePickerId !== null) {
+        // Check if click is inside the date picker or the date badge/icon area
+        const clickedInPicker = e.target.closest('[data-date-picker="true"]') !== null;
+        const clickedInToggle = e.target.closest('[data-date-toggle]') !== null;
+        
+        if (!clickedInPicker && !clickedInToggle) {
+          setDatePickerId(null);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [datePickerId]);
+
+  // Global shortcut: Ctrl/Cmd+F to focus search
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        if (todos.length > 5 || searchText) {
+          searchInputRef.current?.focus();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [todos.length, searchText]);
 
   const loadTodos = async () => {
     try {
@@ -323,6 +373,16 @@ export default function TodoWindow() {
     setEditText('');
   };
 
+  const handleSetDueDate = async (id, dateStr) => {
+    try {
+      await electronAPI.setDueDate(id, dateStr || null);
+      setDatePickerId(null);
+      await loadTodos();
+    } catch (error) {
+      console.error('Failed to set due date:', error);
+    }
+  };
+
   const handleEditKeyDown = (e, id) => {
     if (e.key === 'Enter' && !isComposingRef.current) {
       e.preventDefault();
@@ -373,7 +433,7 @@ export default function TodoWindow() {
       const newScale = Math.max(0.3, Math.min(2.5, resizeStart.scale + scaleDelta));
       scaleRef.current = newScale;
       setScale(newScale);
-      electronAPI?.setScale(newScale);
+      electronAPI?.adjustScale(newScale);
     };
 
     const handleMouseUp = () => {
@@ -389,13 +449,24 @@ export default function TodoWindow() {
     };
   }, [isResizing, resizeStart]);
 
+  // Filter todos by search text
+  const filteredTodos = todos.filter((t) => {
+    if (!searchText.trim()) return true;
+    const keyword = searchText.toLowerCase();
+    return (
+      t.text.toLowerCase().includes(keyword) ||
+      (t.note && t.note.toLowerCase().includes(keyword)) ||
+      (t.category && t.category.toLowerCase().includes(keyword))
+    );
+  });
+
   // Separate active and completed todos
-  const activeTodos = todos.filter((t) => !t.completed);
-  const completedTodos = todos.filter((t) => t.completed);
+  const activeTodos = filteredTodos.filter((t) => !t.completed);
+  const completedTodos = filteredTodos.filter((t) => t.completed);
 
   return (
     <div className="h-full overflow-hidden" style={{ opacity }}>
-      <div className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 relative" style={{ zoom: scale, transition: 'zoom 0.15s ease-out' }}>
+      <div className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 relative">
       {/* Edge snap indicator */}
       {edgeState.snapped && edgeState.edge && (
         <div className={`snap-indicator ${edgeState.edge}`} />
@@ -410,6 +481,25 @@ export default function TodoWindow() {
           <span className="text-sm font-medium text-gray-600">待办清单</span>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => {
+              setSelectMode(!selectMode);
+              setSelectedIds(new Set());
+            }}
+            className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
+              selectMode
+                ? 'bg-sky-100 text-sky-600'
+                : 'hover:bg-gray-200/60 text-gray-400 hover:text-gray-600'
+            }`}
+            title={selectMode ? '取消选择' : '批量选择'}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+            </svg>
+          </button>
           <button
             onClick={handleOpenTray}
             className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200/60 text-gray-400 hover:text-gray-600 transition-colors"
@@ -430,6 +520,90 @@ export default function TodoWindow() {
           </button>
         </div>
       </div>
+
+      {/* Search Bar */}
+      {searchText || todos.length > 5 ? (
+        <div className="px-3 py-1.5 border-b border-gray-50">
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="搜索任务..."
+              className="w-full pl-7 pr-7 py-1 text-xs bg-gray-50 rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-sky-200 focus:border-sky-300 transition-all placeholder-gray-400"
+            />
+            {searchText && (
+              <button
+                onClick={() => setSearchText('')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Selection Bar */}
+      {selectMode && (
+        <div className="px-3 py-1.5 bg-sky-50 border-b border-sky-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={selectedIds.size === todos.length && todos.length > 0}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedIds(new Set(todos.map(t => t.id)));
+                } else {
+                  setSelectedIds(new Set());
+                }
+              }}
+              className="w-4 h-4 rounded border-gray-300 text-sky-500 focus:ring-sky-200 cursor-pointer"
+            />
+            <span className="text-xs text-sky-700 font-medium">
+              {selectedIds.size > 0 ? `已选 ${selectedIds.size} 项` : '全选'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                for (const id of [...selectedIds]) {
+                  try { await electronAPI.deleteTodo(id); } catch (e) {}
+                }
+                setSelectedIds(new Set());
+                await loadTodos();
+              }}
+              disabled={selectedIds.size === 0}
+              className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              批量删除
+            </button>
+            <button
+              onClick={async () => {
+                for (const id of [...selectedIds]) {
+                  const todo = todos.find(t => t.id === id);
+                  if (todo && todo.completed) {
+                    try { await electronAPI.archiveTodo(id); } catch (e) {}
+                  }
+                }
+                setSelectedIds(new Set());
+                await loadTodos();
+              }}
+              disabled={selectedIds.size === 0 || !completedTodos.some(t => selectedIds.has(t.id))}
+              className="px-2 py-1 text-xs text-sky-600 bg-sky-50 rounded hover:bg-sky-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              批量归档
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Input Area */}
       <div className="px-3 py-2 border-b border-gray-50">
@@ -468,7 +642,7 @@ export default function TodoWindow() {
               <div className="h-0.5 bg-sky-400 rounded-full mx-2 transition-all" />
             )}
             <div
-              draggable={editingId !== todo.id}
+              draggable={editingId !== todo.id && !selectMode}
               onDragStart={(e) => handleDragStart(e, todo.id)}
               onDragOver={(e) => handleDragOver(e, todo.id)}
               onDrop={(e) => handleDrop(e, todo.id)}
@@ -482,12 +656,32 @@ export default function TodoWindow() {
               style={borderColor ? { borderLeft: `3px solid ${borderColor}` } : undefined}
               onContextMenu={(e) => handleContextMenu(e, todo)}
             >
+              {/* Checkbox (select mode) */}
+              {selectMode && (
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(todo.id)}
+                  onChange={() => {
+                    const newSelected = new Set(selectedIds);
+                    if (newSelected.has(todo.id)) {
+                      newSelected.delete(todo.id);
+                    } else {
+                      newSelected.add(todo.id);
+                    }
+                    setSelectedIds(newSelected);
+                  }}
+                  className="flex-shrink-0 w-4 h-4 rounded border-gray-300 text-sky-500 focus:ring-sky-200 cursor-pointer"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              )}
               {/* Drag handle */}
+              {!selectMode && (
               <svg className="flex-shrink-0 w-3.5 h-3.5 text-gray-300 group-hover:text-gray-400 cursor-grab active:cursor-grabbing" viewBox="0 0 16 16" fill="currentColor">
                 <circle cx="5" cy="3" r="1.5" /><circle cx="11" cy="3" r="1.5" />
                 <circle cx="5" cy="8" r="1.5" /><circle cx="11" cy="8" r="1.5" />
                 <circle cx="5" cy="13" r="1.5" /><circle cx="11" cy="13" r="1.5" />
               </svg>
+              )}
               <button
                 onClick={() => handleToggle(todo.id)}
                 className={`flex-shrink-0 w-5 h-5 rounded-full border-2 border-gray-300 hover:border-sky-400 transition-colors flex items-center justify-center ${checkPulseIds.has(todo.id) ? 'todo-check-animate' : ''}`}
@@ -516,6 +710,39 @@ export default function TodoWindow() {
                   {todo.text}
                 </span>
               )}
+              {/* Due date badge - click to toggle date picker */}
+              {!editingId && todo.due_date && (
+                <span
+                  data-date-toggle={todo.id}
+                  onClick={() => setDatePickerId(datePickerId === todo.id ? null : todo.id)}
+                  className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium cursor-pointer hover:opacity-80 transition-opacity ${
+                    todo.due_date < new Date().toISOString().slice(0, 10)
+                      ? 'bg-red-100 text-red-600'
+                      : todo.due_date === new Date().toISOString().slice(0, 10)
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-gray-100 text-gray-500'
+                  }`}
+                  title="点击设置截止日期"
+                >
+                  {todo.due_date.slice(5).replace('-', '/')}
+                </span>
+              )}
+              {/* Calendar icon: set due date */}
+              {!editingId && (
+                <button
+                  data-date-toggle={todo.id}
+                  onClick={() => setDatePickerId(datePickerId === todo.id ? null : todo.id)}
+                  className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-sky-50 text-gray-300 hover:text-sky-500 transition-all"
+                  title={todo.due_date ? '修改截止日期' : '设置截止日期'}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </button>
+              )}
               <button
                 onClick={() => handleDelete(todo.id)}
                 className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
@@ -525,6 +752,25 @@ export default function TodoWindow() {
                 </svg>
               </button>
             </div>
+            {/* Inline date picker */}
+            {datePickerId === todo.id && (
+              <div ref={datePickerRef} data-date-picker="true" className="px-2 py-1.5 bg-gray-50 rounded-b-lg flex items-center gap-2 border-t border-gray-100">
+                <input
+                  type="date"
+                  defaultValue={todo.due_date || ''}
+                  onChange={(e) => handleSetDueDate(todo.id, e.target.value || null)}
+                  className="flex-1 px-2 py-1 text-xs bg-white rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-sky-200"
+                />
+                {todo.due_date && (
+                  <button
+                    onClick={() => handleSetDueDate(todo.id, null)}
+                    className="px-2 py-1 text-xs text-red-500 hover:bg-red-100 rounded transition-colors"
+                  >
+                    清除
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           );
         })}

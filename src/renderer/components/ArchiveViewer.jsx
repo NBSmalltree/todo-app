@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 const { electronAPI } = window;
 
@@ -16,11 +16,57 @@ export default function ArchiveViewer() {
   const [isLoading, setIsLoading] = useState(false);
   const [exportType, setExportType] = useState('archived');
   const [isExporting, setIsExporting] = useState(false);
+  const [searchInputValue, setSearchInputValue] = useState(filters.searchText);
+  const [categorizingId, setCategorizingId] = useState(null); // Track which item is being categorized
+  const [toast, setToast] = useState(null); // Toast message and type
+  const [scale, setScale] = useState(1); // Scale state for zoom
+  const [selectMode, setSelectMode] = useState(false);       // 批量选择模式
+  const [selectedIds, setSelectedIds] = useState(new Set());  // 已选中的归档 id
+  const toastTimeoutRef = useRef(null);
+  const searchDebounceRef = useRef(null);
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
 
   useEffect(() => {
     loadArchives();
     loadCategories();
   }, [filters]);
+
+  // Handle mouse wheel for scaling
+  useEffect(() => {
+    const handleWheel = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const raw = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
+        const delta = -(raw / 2000);
+        const newScale = Math.max(0.3, Math.min(2.5, scaleRef.current + delta));
+        scaleRef.current = newScale;
+        setScale(newScale);
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel, { passive: false });
+  }, []);
+
+  // Apply scale to root font size
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${scale * 16}px`;
+  }, [scale]);
+
+  // Debounce search input: only update filters.searchText after 300ms pause
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setFilters((prev) => {
+        if (prev.searchText !== searchInputValue) {
+          return { ...prev, searchText: searchInputValue };
+        }
+        return prev;
+      });
+    }, 300);
+    return () => clearTimeout(searchDebounceRef.current);
+  }, [searchInputValue]);
 
   // Auto-refresh when data changes (archive or categorize)
   useEffect(() => {
@@ -51,6 +97,15 @@ export default function ArchiveViewer() {
     }
   };
 
+  // Show toast message
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  }, []);
+  
   const handleNoteDoubleClick = (item) => {
     setEditingNote(item.id);
     setNoteText(item.note || '');
@@ -87,6 +142,7 @@ export default function ArchiveViewer() {
   };
 
   const handleClearFilters = () => {
+    setSearchInputValue('');
     setFilters({
       category: 'all',
       startDate: '',
@@ -96,6 +152,7 @@ export default function ArchiveViewer() {
   };
 
   const handleCategorize = async (item) => {
+    setCategorizingId(item.id);
     try {
       const category = await electronAPI.categorize(item.text);
       if (category) {
@@ -105,6 +162,8 @@ export default function ArchiveViewer() {
       }
     } catch (error) {
       console.error('Failed to categorize:', error);
+    } finally {
+      setCategorizingId(null);
     }
   };
 
@@ -136,13 +195,13 @@ export default function ArchiveViewer() {
         exportType,
       });
       if (result?.success) {
-        alert(`导出成功：${result.filePath}`);
+        showToast(`导出成功：${result.filePath}`, 'success');
       } else if (result?.message) {
-        alert(result.message);
+        showToast(result.message, 'info');
       }
     } catch (error) {
       console.error('Failed to export:', error);
-      alert('导出失败');
+      showToast('导出失败', 'error');
     } finally {
       setIsExporting(false);
     }
@@ -150,7 +209,8 @@ export default function ArchiveViewer() {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
-    const date = new Date(dateStr);
+    // 数据库中存的是北京时间字符串 "YYYY-MM-DD HH:MM:SS"，解析时显式指定为 +08:00
+    const date = new Date(dateStr.replace(' ', 'T') + '+08:00');
     return date.toLocaleString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
@@ -162,6 +222,19 @@ export default function ArchiveViewer() {
 
   return (
     <div className="h-full flex flex-col p-6">
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-in-out">
+          <div className={`px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium ${
+            toast.type === 'success' ? 'bg-green-500 text-white' :
+            toast.type === 'error' ? 'bg-red-500 text-white' :
+            'bg-sky-500 text-white'
+          }`}>
+            {toast.message}
+          </div>
+        </div>
+      )}
+
       {/* Filter Bar */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
         <div className="flex flex-wrap gap-3 items-end">
@@ -170,8 +243,8 @@ export default function ArchiveViewer() {
             <label className="block text-xs text-gray-500 mb-1">搜索</label>
             <input
               type="text"
-              value={filters.searchText}
-              onChange={(e) => handleFilterChange('searchText', e.target.value)}
+              value={searchInputValue}
+              onChange={(e) => setSearchInputValue(e.target.value)}
               placeholder="搜索任务或备注..."
               className="w-full px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
             />
@@ -223,6 +296,21 @@ export default function ArchiveViewer() {
             重置
           </button>
 
+          {/* Select Mode Toggle */}
+          <button
+            onClick={() => {
+              setSelectMode(!selectMode);
+              setSelectedIds(new Set());
+            }}
+            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+              selectMode
+                ? 'bg-sky-500 text-white'
+                : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
+            }`}
+          >
+            {selectMode ? '取消' : '选择'}
+          </button>
+
           {/* Export */}
           <div className="flex items-center gap-2 ml-auto">
             <select
@@ -245,6 +333,59 @@ export default function ArchiveViewer() {
         </div>
       </div>
 
+      {/* Batch Action Bar */}
+      {selectMode && (
+        <div className="bg-sky-50 border-b border-sky-100 px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={selectedIds.size === archives.length && archives.length > 0}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedIds(new Set(archives.map(a => a.id)));
+                } else {
+                  setSelectedIds(new Set());
+                }
+              }}
+              className="w-4 h-4 rounded border-gray-300 text-sky-500 focus:ring-sky-200 cursor-pointer"
+            />
+            <span className="text-xs text-sky-700 font-medium">
+              {selectedIds.size > 0 ? `已选 ${selectedIds.size} 项` : '全选'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                for (const id of [...selectedIds]) {
+                  try { await electronAPI.restoreTodo(id); } catch (e) {}
+                }
+                setSelectedIds(new Set());
+                await loadArchives();
+                await loadCategories();
+              }}
+              disabled={selectedIds.size === 0}
+              className="px-2 py-1 text-xs text-green-600 bg-green-50 rounded hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              批量恢复
+            </button>
+            <button
+              onClick={async () => {
+                for (const id of [...selectedIds]) {
+                  try { await electronAPI.deleteTodo(id); } catch (e) {}
+                }
+                setSelectedIds(new Set());
+                await loadArchives();
+                await loadCategories();
+              }}
+              disabled={selectedIds.size === 0}
+              className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              批量删除
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Archive List */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {isLoading ? (
@@ -264,8 +405,27 @@ export default function ArchiveViewer() {
             <table className="w-full">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
+                  {selectMode && (
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.size === archives.length && archives.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(new Set(archives.map(a => a.id)));
+                          } else {
+                            setSelectedIds(new Set());
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-sky-500 focus:ring-sky-200 cursor-pointer"
+                      />
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     任务内容
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    截止日期
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     类别
@@ -284,10 +444,42 @@ export default function ArchiveViewer() {
               <tbody className="divide-y divide-gray-100">
                 {archives.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                    {selectMode && (
+                      <td className="px-4 py-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(item.id)}
+                          onChange={() => {
+                            const newSelected = new Set(selectedIds);
+                            if (newSelected.has(item.id)) {
+                              newSelected.delete(item.id);
+                            } else {
+                              newSelected.add(item.id);
+                            }
+                            setSelectedIds(newSelected);
+                          }}
+                          className="w-4 h-4 rounded border-gray-300 text-sky-500 focus:ring-sky-200 cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <span className="text-sm text-gray-700">
                         {item.text}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {item.due_date ? (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          item.due_date < new Date().toISOString().slice(0, 10)
+                            ? 'bg-red-100 text-red-600'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {item.due_date}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700">
@@ -331,10 +523,18 @@ export default function ArchiveViewer() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleCategorize(item)}
-                          className="px-2 py-1 text-xs text-sky-600 bg-sky-50 rounded hover:bg-sky-100 transition-colors"
+                          disabled={categorizingId === item.id}
+                          className="px-2 py-1 text-xs text-sky-600 bg-sky-50 rounded hover:bg-sky-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="使用AI自动分类"
                         >
-                          AI分类
+                          {categorizingId === item.id ? (
+                            <span className="flex items-center gap-1">
+                              <div className="animate-spin rounded-full h-3 w-3 border-b border-sky-600" />
+                              分类中
+                            </span>
+                          ) : (
+                            'AI分类'
+                          )}
                         </button>
                         <button
                           onClick={() => handleRestore(item.id)}

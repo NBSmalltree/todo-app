@@ -394,7 +394,7 @@ class EdgeManager {
       if (this.isMouseInTriggerZone(point)) {
         this.showWindow();
       }
-    }, 50);
+    }, 150);
   }
 
   // Stop mouse polling
@@ -446,9 +446,9 @@ class EdgeManager {
 
       if (!insideWindow) {
         this.stopMouseLeaveWatcher();
-        this.hideTimer = setTimeout(() => this.hideWindow(), 500);
+        this.hideTimer = setTimeout(() => this.hideWindow(), 600);
       }
-    }, 100);
+    }, 200);
   }
 
   // Stop mouse leave watcher

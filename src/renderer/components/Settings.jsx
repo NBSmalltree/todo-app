@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const { electronAPI } = window;
 
@@ -41,6 +41,8 @@ export default function Settings() {
     api_format: 'openai',
     base_url: 'https://api.openai.com/v1',
     model: 'gpt-4o-mini',
+    categorize_max_tokens: 2048,
+    analyze_max_tokens: 10000,
   });
   const [theme, setTheme] = useState('light');
   const [opacity, setOpacity] = useState(0.92);
@@ -53,10 +55,35 @@ export default function Settings() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [scale, setScale] = useState(1);
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
 
   useEffect(() => {
     loadSettings();
   }, []);
+
+  // Handle mouse wheel for scaling
+  useEffect(() => {
+    const handleWheel = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const raw = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
+        const delta = -(raw / 2000);
+        const newScale = Math.max(0.3, Math.min(2.5, scaleRef.current + delta));
+        scaleRef.current = newScale;
+        setScale(newScale);
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel, { passive: false });
+  }, []);
+
+  // Apply scale to root font size
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${scale * 16}px`;
+  }, [scale]);
 
   // Apply theme whenever it changes
   useEffect(() => {
@@ -87,6 +114,8 @@ export default function Settings() {
       if (data.api_format) setSettings((prev) => ({ ...prev, api_format: data.api_format }));
       if (data.base_url) setSettings((prev) => ({ ...prev, base_url: data.base_url }));
       if (data.model) setSettings((prev) => ({ ...prev, model: data.model }));
+      if (data.categorize_max_tokens) setSettings((prev) => ({ ...prev, categorize_max_tokens: data.categorize_max_tokens }));
+      if (data.analyze_max_tokens) setSettings((prev) => ({ ...prev, analyze_max_tokens: data.analyze_max_tokens }));
       if (data.theme && ['light', 'dark', 'eye-care'].includes(data.theme)) setTheme(data.theme);
       if (data.todo_opacity != null) {
         const v = Number(data.todo_opacity);
@@ -218,7 +247,11 @@ export default function Settings() {
                   {THEMES.map((t) => (
                     <button
                       key={t.id}
-                      onClick={() => setTheme(t.id)}
+                      onClick={() => {
+                        // Apply theme immediately (local first, then IPC sync)
+                        document.documentElement.setAttribute('data-theme', t.id);
+                        setTheme(t.id);
+                      }}
                       className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
                         theme === t.id
                           ? 'border-sky-500 bg-sky-50 text-sky-600'
@@ -373,6 +406,40 @@ export default function Settings() {
                 />
                 <p className="text-xs text-gray-400 mt-1">使用的模型名称，如 gpt-4o-mini、gpt-4、claude-3-haiku 等</p>
               </div>
+
+              {/* Categorize Max Tokens */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  分类最大 Token 数
+                </label>
+                <input
+                  type="number"
+                  value={settings.categorize_max_tokens}
+                  onChange={(e) => handleChange('categorize_max_tokens', parseInt(e.target.value) || 2048)}
+                  placeholder="2048"
+                  min="256"
+                  max="4096"
+                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                />
+                <p className="text-xs text-gray-400 mt-1">AI 分类时的最大 Token 数（256-4096）</p>
+              </div>
+
+              {/* Analyze Max Tokens */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  分析最大 Token 数
+                </label>
+                <input
+                  type="number"
+                  value={settings.analyze_max_tokens}
+                  onChange={(e) => handleChange('analyze_max_tokens', parseInt(e.target.value) || 10000)}
+                  placeholder="10000"
+                  min="1024"
+                  max="16384"
+                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                />
+                <p className="text-xs text-gray-400 mt-1">AI 工作分析时的最大 Token 数（1024-16384）</p>
+              </div>
             </div>
           </div>
 
@@ -444,6 +511,67 @@ export default function Settings() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-400 mt-1">距离屏幕边缘多近时触发吸附</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Data Management */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">数据管理</h2>
+            <p className="text-sm text-gray-500 mb-4">备份或恢复您的待办数据</p>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">备份数据</label>
+                  <p className="text-xs text-gray-400 mt-1">将当前数据导出到指定位置</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      const result = await electronAPI.backupDatabase();
+                      if (result.success) {
+                        alert('备份成功！文件已保存到：' + result.path);
+                      } else {
+                        alert('备份失败：' + result.error);
+                      }
+                    } catch (error) {
+                      alert('备份失败：' + error.message);
+                    }
+                  }}
+                  className="px-4 py-2 text-sm font-medium bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors"
+                >
+                  备份数据
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">恢复数据</label>
+                  <p className="text-xs text-gray-400 mt-1">从备份文件恢复数据（会覆盖当前数据）</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!confirm('确定要从备份文件恢复数据吗？当前数据将被覆盖！')) {
+                      return;
+                    }
+                    try {
+                      const result = await electronAPI.restoreDatabase();
+                      if (result.success) {
+                        alert('恢复成功！应用将重启以应用更改。');
+                        // Reload the window to apply changes
+                        window.location.reload();
+                      } else {
+                        alert('恢复失败：' + result.error);
+                      }
+                    } catch (error) {
+                      alert('恢复失败：' + error.message);
+                    }
+                  }}
+                  className="px-4 py-2 text-sm font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                >
+                  恢复数据
+                </button>
               </div>
             </div>
           </div>

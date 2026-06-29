@@ -2,12 +2,32 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const { app } = require('electron');
 
+// 获取北京时间（UTC+8）格式化字符串 YYYY-MM-DD HH:MM:SS
+// 中国无夏令时，直接加 8 小时即可
+// 如不传参数，返回当前北京时间；可传入 Date 对象，返回该时间的北京时间表示
+function nowBeijing(date) {
+  const d = date || new Date();
+  const beijingTime = new Date(d.getTime() + 8 * 60 * 60 * 1000);
+  return beijingTime.toISOString().replace('T', ' ').slice(0, 19);
+}
+
 class TodoDatabase {
   constructor() {
-    const dbPath = path.join(app.getPath('userData'), 'todofloat.db');
-    this.db = new Database(dbPath);
+    this.dbPath = path.join(app.getPath('userData'), 'todofloat.db');
+    this.db = new Database(this.dbPath);
     this.db.pragma('journal_mode = WAL');
     this.init();
+  }
+
+  getDbPath() {
+    return this.dbPath;
+  }
+
+  close() {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
   }
 
   init() {
@@ -29,244 +49,377 @@ class TodoDatabase {
         value TEXT
       );
 
+      CREATE TABLE IF NOT EXISTS schema_version (
+        version INTEGER PRIMARY KEY
+      );
+
       CREATE INDEX IF NOT EXISTS idx_todos_archived ON todos(archived);
       CREATE INDEX IF NOT EXISTS idx_todos_completed ON todos(completed);
       CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(created_at);
       CREATE INDEX IF NOT EXISTS idx_todos_archived_at ON todos(archived_at);
     `);
 
-    // Migration: add sort_order column if missing
-    try {
-      this.db.exec('ALTER TABLE todos ADD COLUMN sort_order INTEGER');
-      // Initialize sort_order for existing rows: active items by created_at DESC
-      this.db.exec(`
-        UPDATE todos SET sort_order = (
-          SELECT COUNT(*) FROM todos t2
-          WHERE t2.archived = 0 AND t2.completed = 0
-            AND (t2.created_at > todos.created_at OR (t2.created_at = todos.created_at AND t2.id > todos.id))
-        ) WHERE archived = 0 AND completed = 0
-      `);
-    } catch (e) { /* column already exists */ }
+    // Schema version-driven migrations
+    const row = this.db.prepare('SELECT MAX(version) as v FROM schema_version').get();
+    const currentVersion = row?.v ?? 0;
 
-    // Migration: add color column if missing
-    try {
-      this.db.exec('ALTER TABLE todos ADD COLUMN color TEXT');
-    } catch (e) { /* column already exists */ }
+    const migrations = [
+      {
+        version: 1,
+        sql: 'ALTER TABLE todos ADD COLUMN sort_order INTEGER',
+        after: () => {
+          this.db.exec(`
+            UPDATE todos SET sort_order = (
+              SELECT COUNT(*) FROM todos t2
+              WHERE t2.archived = 0 AND t2.completed = 0
+                AND (t2.created_at > todos.created_at OR (t2.created_at = todos.created_at AND t2.id > todos.id))
+            ) WHERE archived = 0 AND completed = 0
+          `);
+        },
+      },
+      {
+        version: 2,
+        sql: 'ALTER TABLE todos ADD COLUMN color TEXT',
+      },
+      {
+        version: 3,
+        sql: 'SELECT 1', // no-op, actual work done in after()
+        after: () => {
+          // 将 archived_at 和 completed_at 从 UTC 时间转为北京时间（UTC+8）
+          // 旧数据通过 toISOString() 存的是 UTC，需要加 8 小时
+          this.db.exec(`
+            UPDATE todos SET archived_at = datetime(archived_at, '+8 hours')
+            WHERE archived_at IS NOT NULL AND archived_at != ''
+          `);
+          this.db.exec(`
+            UPDATE todos SET completed_at = datetime(completed_at, '+8 hours')
+            WHERE completed_at IS NOT NULL AND completed_at != ''
+          `);
+          this.db.exec(`
+            UPDATE todos SET created_at = datetime(created_at, '+8 hours')
+            WHERE created_at IS NOT NULL AND created_at != '' AND created_at NOT LIKE '%+08:00%'
+          `);
+        },
+      },
+      {
+        version: 4,
+        sql: 'ALTER TABLE todos ADD COLUMN due_date TEXT',
+      },
+    ];
+
+    const insertVersion = this.db.prepare('INSERT OR IGNORE INTO schema_version (version) VALUES (?)');
+
+    for (const migration of migrations) {
+      if (migration.version <= currentVersion) continue;
+      try {
+        this.db.exec(migration.sql);
+        if (migration.after) migration.after();
+        insertVersion.run(migration.version);
+      } catch (e) {
+        if (e.message && e.message.includes('duplicate column')) {
+          // Column already exists (e.g. crash between ALTER and version insert)
+          insertVersion.run(migration.version);
+        } else {
+          console.error(`Migration v${migration.version} failed:`, e.message);
+        }
+      }
+    }
   }
 
   getTodos() {
-    return this.db
-      .prepare('SELECT * FROM todos WHERE archived = 0 ORDER BY completed ASC, sort_order ASC, created_at DESC')
-      .all();
+    try {
+      return this.db
+        .prepare('SELECT * FROM todos WHERE archived = 0 ORDER BY completed ASC, sort_order ASC, created_at DESC')
+        .all();
+    } catch (e) {
+      console.error('getTodos failed:', e);
+      return [];
+    }
   }
 
   addTodo(text) {
-    const maxOrder = this.db.prepare('SELECT MAX(sort_order) as maxOrder FROM todos WHERE archived = 0 AND completed = 0').get();
-    const nextOrder = (maxOrder?.maxOrder ?? -1) + 1;
-    const stmt = this.db.prepare('INSERT INTO todos (text, sort_order) VALUES (?, ?)');
-    const result = stmt.run(text, nextOrder);
-    return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(result.lastInsertRowid);
+    try {
+      const maxOrder = this.db.prepare('SELECT MAX(sort_order) as maxOrder FROM todos WHERE archived = 0 AND completed = 0').get();
+      const nextOrder = (maxOrder?.maxOrder ?? -1) + 1;
+      const stmt = this.db.prepare('INSERT INTO todos (text, sort_order) VALUES (?, ?)');
+      const result = stmt.run(text, nextOrder);
+      return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(result.lastInsertRowid);
+    } catch (e) {
+      console.error('addTodo failed:', e);
+      return { success: false, error: e.message };
+    }
   }
 
   updateOrders(orders) {
-    const stmt = this.db.prepare('UPDATE todos SET sort_order = ? WHERE id = ?');
-    const transaction = this.db.transaction((items) => {
-      items.forEach(({ id, sort_order }) => stmt.run(sort_order, id));
-    });
-    transaction(orders);
-    return { success: true };
+    try {
+      const stmt = this.db.prepare('UPDATE todos SET sort_order = ? WHERE id = ?');
+      const transaction = this.db.transaction((items) => {
+        items.forEach(({ id, sort_order }) => stmt.run(sort_order, id));
+      });
+      transaction(orders);
+      return { success: true };
+    } catch (e) {
+      console.error('updateOrders failed:', e);
+      return { success: false, error: e.message };
+    }
   }
 
   updateColor(id, color) {
-    this.db.prepare('UPDATE todos SET color = ? WHERE id = ?').run(color || null, id);
-    return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    try {
+      this.db.prepare('UPDATE todos SET color = ? WHERE id = ?').run(color || null, id);
+      return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('updateColor failed:', e);
+      return null;
+    }
   }
 
   updateText(id, text) {
-    this.db.prepare('UPDATE todos SET text = ? WHERE id = ?').run(text, id);
-    return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    try {
+      this.db.prepare('UPDATE todos SET text = ? WHERE id = ?').run(text, id);
+      return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('updateText failed:', e);
+      return null;
+    }
   }
 
   toggleTodo(id) {
-    const todo = this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
-    if (!todo) return null;
+    try {
+      const todo = this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+      if (!todo) return null;
 
-    const newCompleted = todo.completed ? 0 : 1;
-    const completedAt = newCompleted
-      ? new Date().toISOString().replace('T', ' ').slice(0, 19)
-      : null;
+      const newCompleted = todo.completed ? 0 : 1;
+      const completedAt = newCompleted
+        ? nowBeijing()
+        : null;
 
-    this.db
-      .prepare('UPDATE todos SET completed = ?, completed_at = ? WHERE id = ?')
-      .run(newCompleted, completedAt, id);
+      this.db
+        .prepare('UPDATE todos SET completed = ?, completed_at = ? WHERE id = ?')
+        .run(newCompleted, completedAt, id);
 
-    return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+      return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('toggleTodo failed:', e);
+      return null;
+    }
   }
 
   deleteTodo(id) {
-    this.db.prepare('DELETE FROM todos WHERE id = ?').run(id);
-    return { success: true };
+    try {
+      this.db.prepare('DELETE FROM todos WHERE id = ?').run(id);
+      return { success: true };
+    } catch (e) {
+      console.error('deleteTodo failed:', e);
+      return { success: false, error: e.message };
+    }
   }
 
   restoreTodo(id) {
-    this.db
-      .prepare('UPDATE todos SET completed = 0, completed_at = NULL, archived = 0, archived_at = NULL WHERE id = ?')
-      .run(id);
-    return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    try {
+      this.db
+        .prepare('UPDATE todos SET completed = 0, completed_at = NULL, archived = 0, archived_at = NULL WHERE id = ?')
+        .run(id);
+      return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('restoreTodo failed:', e);
+      return null;
+    }
   }
 
   archiveTodo(id) {
-    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
-    this.db
-      .prepare('UPDATE todos SET archived = 1, archived_at = ? WHERE id = ?')
-      .run(now, id);
-    return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    try {
+      this.db
+        .prepare('UPDATE todos SET archived = 1, archived_at = ? WHERE id = ?')
+        .run(nowBeijing(), id);
+      return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('archiveTodo failed:', e);
+      return null;
+    }
   }
 
   getArchived(filters = {}) {
-    let query = 'SELECT * FROM todos WHERE archived = 1';
-    const params = [];
+    try {
+      let query = 'SELECT * FROM todos WHERE archived = 1';
+      const params = [];
 
-    if (filters.category && filters.category !== 'all') {
-      query += ' AND category = ?';
-      params.push(filters.category);
+      if (filters.category && filters.category !== 'all') {
+        query += ' AND category = ?';
+        params.push(filters.category);
+      }
+
+      if (filters.startDate) {
+        query += ' AND archived_at >= ?';
+        params.push(filters.startDate);
+      }
+
+      if (filters.endDate) {
+        query += ' AND archived_at <= ?';
+        params.push(filters.endDate + ' 23:59:59');
+      }
+
+      if (filters.searchText) {
+        query += ' AND (text LIKE ? OR note LIKE ?)';
+        params.push(`%${filters.searchText}%`, `%${filters.searchText}%`);
+      }
+
+      query += ' ORDER BY archived_at DESC';
+
+      return this.db.prepare(query).all(...params);
+    } catch (e) {
+      console.error('getArchived failed:', e);
+      return [];
     }
-
-    if (filters.startDate) {
-      query += ' AND archived_at >= ?';
-      params.push(filters.startDate);
-    }
-
-    if (filters.endDate) {
-      query += ' AND archived_at <= ?';
-      params.push(filters.endDate + ' 23:59:59');
-    }
-
-    if (filters.searchText) {
-      query += ' AND (text LIKE ? OR note LIKE ?)';
-      params.push(`%${filters.searchText}%`, `%${filters.searchText}%`);
-    }
-
-    query += ' ORDER BY archived_at DESC';
-
-    return this.db.prepare(query).all(...params);
   }
 
   updateNote(id, note) {
-    this.db.prepare('UPDATE todos SET note = ? WHERE id = ?').run(note, id);
-    return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    try {
+      this.db.prepare('UPDATE todos SET note = ? WHERE id = ?').run(note, id);
+      return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('updateNote failed:', e);
+      return null;
+    }
   }
 
   updateCategory(id, category) {
-    this.db.prepare('UPDATE todos SET category = ? WHERE id = ?').run(category, id);
-    return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    try {
+      this.db.prepare('UPDATE todos SET category = ? WHERE id = ?').run(category, id);
+      return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('updateCategory failed:', e);
+      return null;
+    }
+  }
+
+  setDueDate(id, dueDate) {
+    try {
+      this.db.prepare('UPDATE todos SET due_date = ? WHERE id = ?').run(dueDate || null, id);
+      return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('setDueDate failed:', e);
+      return null;
+    }
   }
 
   getCategories() {
-    return this.db
-      .prepare('SELECT DISTINCT category FROM todos WHERE archived = 1 AND category IS NOT NULL')
-      .all()
-      .map((r) => r.category);
+    try {
+      return this.db
+        .prepare('SELECT DISTINCT category FROM todos WHERE archived = 1 AND category IS NOT NULL')
+        .all()
+        .map((r) => r.category);
+    } catch (e) {
+      console.error('getCategories failed:', e);
+      return [];
+    }
   }
 
   getWorkAnalysis(period = 'week') {
-    let dateFilter;
-    const now = new Date();
+    try {
+      // 使用 SQLite 的 localtime 计算周期起点（依赖系统时区设为北京时间）
+      let dateSql;
+      switch (period) {
+        case 'week':
+          // 本周周一 00:00:00（SQLite 的 'weekday 1' = 周一）
+          dateSql = `date('now', 'localtime', 'weekday 1')`;
+          break;
+        case 'month':
+          dateSql = `date('now', 'localtime', 'start of month')`;
+          break;
+        case 'year':
+          dateSql = `date('now', 'localtime', 'start of year')`;
+          break;
+        default:
+          dateSql = `'1970-01-01'`;
+      }
 
-    switch (period) {
-      case 'week': {
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay() + 1);
-        startOfWeek.setHours(0, 0, 0, 0);
-        dateFilter = startOfWeek.toISOString().replace('T', ' ').slice(0, 19);
-        break;
-      }
-      case 'month': {
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        dateFilter = startOfMonth.toISOString().replace('T', ' ').slice(0, 19);
-        break;
-      }
-      case 'year': {
-        const startOfYear = new Date(now.getFullYear(), 0, 1);
-        dateFilter = startOfYear.toISOString().replace('T', ' ').slice(0, 19);
-        break;
-      }
-      default:
-        dateFilter = '1970-01-01';
+      // 先查出周期起点的日期字符串
+      const dateFilterRow = this.db.prepare(`SELECT ${dateSql} as startDate`).get();
+      const dateFilter = dateFilterRow.startDate + ' 00:00:00';
+
+      const items = this.db
+        .prepare(
+          `SELECT * FROM todos
+           WHERE archived = 1 AND archived_at >= ?
+           ORDER BY archived_at DESC`
+        )
+        .all(dateFilter);
+
+      const categoryCount = {};
+      items.forEach((item) => {
+        const cat = item.category || '未分类';
+        if (!categoryCount[cat]) categoryCount[cat] = { count: 0, items: [] };
+        categoryCount[cat].count++;
+        categoryCount[cat].items.push(item);
+      });
+
+      const dailyCount = {};
+      items.forEach((item) => {
+        const day = item.archived_at ? item.archived_at.slice(0, 10) : 'unknown';
+        dailyCount[day] = (dailyCount[day] || 0) + 1;
+      });
+
+      const totalTodos = this.db
+        .prepare(
+          `SELECT COUNT(*) as total,
+                  SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) as archived,
+                  SUM(CASE WHEN archived = 0 AND completed = 1 THEN 1 ELSE 0 END) as completed,
+                  SUM(CASE WHEN archived = 0 AND completed = 0 THEN 1 ELSE 0 END) as active
+           FROM todos`
+        )
+        .get();
+
+      return {
+        period,
+        totalItems: items.length,
+        categoryDistribution: categoryCount,
+        dailyDistribution: dailyCount,
+        completionStats: totalTodos,
+        items,
+      };
+    } catch (e) {
+      console.error('getWorkAnalysis failed:', e);
+      return {};
     }
-
-    // Get archived items in period
-    const items = this.db
-      .prepare(
-        `SELECT * FROM todos
-         WHERE archived = 1 AND archived_at >= ?
-         ORDER BY archived_at DESC`
-      )
-      .all(dateFilter);
-
-    // Category distribution
-    const categoryCount = {};
-    items.forEach((item) => {
-      const cat = item.category || '未分类';
-      if (!categoryCount[cat]) categoryCount[cat] = { count: 0, items: [] };
-      categoryCount[cat].count++;
-      categoryCount[cat].items.push(item);
-    });
-
-    // Daily distribution
-    const dailyCount = {};
-    items.forEach((item) => {
-      const day = item.archived_at ? item.archived_at.slice(0, 10) : 'unknown';
-      dailyCount[day] = (dailyCount[day] || 0) + 1;
-    });
-
-    // Completion stats - all todos regardless of creation time
-    const totalTodos = this.db
-      .prepare(
-        `SELECT COUNT(*) as total,
-                SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) as archived,
-                SUM(CASE WHEN archived = 0 AND completed = 1 THEN 1 ELSE 0 END) as completed,
-                SUM(CASE WHEN archived = 0 AND completed = 0 THEN 1 ELSE 0 END) as active
-         FROM todos`
-      )
-      .get();
-
-    return {
-      period,
-      totalItems: items.length,
-      categoryDistribution: categoryCount,
-      dailyDistribution: dailyCount,
-      completionStats: totalTodos,
-      items,
-    };
   }
 
   getSettings() {
-    const rows = this.db
-      .prepare('SELECT key, value FROM settings')
-      .all();
-    const settings = {};
-    rows.forEach((row) => {
-      try {
-        settings[row.key] = JSON.parse(row.value);
-      } catch {
-        settings[row.key] = row.value;
-      }
-    });
-    return settings;
+    try {
+      const rows = this.db
+        .prepare('SELECT key, value FROM settings')
+        .all();
+      const settings = {};
+      rows.forEach((row) => {
+        try {
+          settings[row.key] = JSON.parse(row.value);
+        } catch {
+          settings[row.key] = row.value;
+        }
+      });
+      return settings;
+    } catch (e) {
+      console.error('getSettings failed:', e);
+      return {};
+    }
   }
 
   saveSettings(settings) {
-    const stmt = this.db.prepare(
-      'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)'
-    );
-    const transaction = this.db.transaction((items) => {
-      Object.entries(items).forEach(([key, value]) => {
-        stmt.run(key, typeof value === 'string' ? value : JSON.stringify(value));
+    try {
+      const stmt = this.db.prepare(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)'
+      );
+      const transaction = this.db.transaction((items) => {
+        Object.entries(items).forEach(([key, value]) => {
+          stmt.run(key, typeof value === 'string' ? value : JSON.stringify(value));
+        });
       });
-    });
-    transaction(settings);
-    return { success: true };
+      transaction(settings);
+      return { success: true };
+    } catch (e) {
+      console.error('saveSettings failed:', e);
+      return { success: false, error: e.message };
+    }
   }
 
   close() {
