@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-mac:
+  build-mac-arm64:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,13 +25,40 @@ jobs:
       - name: Build renderer
         run: npm run build:renderer
 
-      - name: Build Electron app
+      - name: Build Electron app (ARM64)
         run: npx electron-builder --mac --publish never
 
-      - name: Upload Mac artifacts
+      - name: Upload Mac ARM64 artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mac-build
+          name: mac-arm64-build
+          path: dist-electron/*.dmg
+
+  build-mac-intel:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+
+      - name: Build renderer
+        run: npm run build:renderer
+
+      - name: Build Electron app (Intel x64)
+        run: npx electron-builder --mac --arch x64 --publish never
+
+      - name: Upload Mac Intel artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-intel-build
           path: dist-electron/*.dmg
 
   build-win:
@@ -62,7 +89,7 @@ jobs:
           path: dist-electron/*.exe
 
   release:
-    needs: [build-mac, build-win]
+    needs: [build-mac-arm64, build-mac-intel, build-win]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
