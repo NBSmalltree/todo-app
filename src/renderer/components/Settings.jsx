@@ -52,6 +52,8 @@ export default function Settings() {
     edge_snap_threshold: 20,
   });
   const [fontFamily, setFontFamily] = useState('system');
+  const [remindEnabled, setRemindEnabled] = useState(true);
+  const [remindMinutes, setRemindMinutes] = useState(15);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -132,9 +134,22 @@ export default function Settings() {
 
       // Load font family
       if (data.font_family) setFontFamily(data.font_family);
+
+      // Load reminder settings
+      if (data.remind_minutes != null) {
+        const val = Number(data.remind_minutes);
+        setRemindMinutes(val >= 0 ? val : 15);
+        setRemindEnabled(val >= 0);
+      }
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
+  };
+
+  const handleRemindChange = async (minutes) => {
+    try {
+      await electronAPI.saveSettings({ remind_minutes: minutes });
+    } catch (e) { /* ignore */ }
   };
 
   const handleSave = async () => {
@@ -146,6 +161,7 @@ export default function Settings() {
         theme,
         todo_opacity: opacity,
         font_family: fontFamily,
+        remind_minutes: remindEnabled ? remindMinutes : -1,
       });
 
       // Save edge settings
@@ -339,6 +355,71 @@ export default function Settings() {
                 </div>
                 <p className="text-xs text-gray-400 mt-2">选择适合您的字体样式，保存后立即生效</p>
               </div>
+            </div>
+          </div>
+
+          {/* Reminder Settings */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">提醒设置</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              任务到达截止日期时，弹出系统通知提醒您
+            </p>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+              {/* Enable/Disable Reminder */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">启用提醒</label>
+                  <p className="text-xs text-gray-400 mt-1">关闭后不会再弹出到期提醒</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const val = remindEnabled ? -1 : 15;
+                    setRemindEnabled(val >= 0);
+                    handleRemindChange(val >= 0 ? 15 : -1);
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    remindEnabled ? 'bg-sky-500' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      remindEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Remind Lead Time */}
+              {remindEnabled && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    提前提醒时间: {remindMinutes} 分钟
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1440"
+                      step="5"
+                      value={remindMinutes}
+                      onChange={(e) => {
+                        setRemindMinutes(Number(e.target.value));
+                        handleRemindChange(Number(e.target.value));
+                      }}
+                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                    />
+                    <span className="text-sm text-gray-600 w-20 text-right">
+                      {remindMinutes >= 60
+                        ? `${Math.floor(remindMinutes / 60)}小时`
+                        : `${remindMinutes}分钟`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    0 = 准时提醒，最大提前 24 小时（1440 分钟）
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

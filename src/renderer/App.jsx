@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import TodoWindow from './components/TodoWindow';
 import TrayView from './components/TrayView';
 import Settings from './components/Settings';
+import QuickAdd from './components/QuickAdd';
 
 export default function App() {
   const [route, setRoute] = useState(window.location.hash.replace('#', '') || '/');
@@ -31,6 +32,10 @@ export default function App() {
 
   if (route === '/settings') {
     return <Settings />;
+  }
+
+  if (route === '/quickadd') {
+    return <QuickAdd />;
   }
 
   return <TodoWindow />;

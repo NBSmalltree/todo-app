@@ -24,6 +24,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   categorize: (text) => ipcRenderer.invoke('llm:categorize', text),
   analyzeWork: (data) => ipcRenderer.invoke('llm:analyzeWork', data),
   testLLM: (settings) => ipcRenderer.invoke('llm:test', settings),
+
+  // Quick add
+  quickAdd: (text) => ipcRenderer.invoke('db:quickAdd', text),
+  closeQuickAdd: () => ipcRenderer.invoke('quickadd:close'),
   exportCsv: (filters) => ipcRenderer.invoke('export:csv', filters),
 
   // Window control

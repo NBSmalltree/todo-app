@@ -384,6 +384,29 @@ class TodoDatabase {
     }
   }
 
+  getDueSoon(withinMinutes = 15) {
+    try {
+      // 查询未完成的、设置了截止日期的、且截止时间在 N 分钟内的任务
+      const now = nowBeijing();
+      const nowDate = new Date(now.replace(' ', 'T') + ':00');
+      const limitTime = new Date(nowDate.getTime() + withinMinutes * 60 * 1000);
+      const limitStr = limitTime.toISOString().replace('T', ' ').slice(0, 19);
+
+      return this.db
+        .prepare(
+          `SELECT * FROM todos
+           WHERE archived = 0 AND completed = 0
+             AND due_date IS NOT NULL AND due_date != ''
+             AND due_date <= ? AND due_date > ?
+           ORDER BY due_date ASC`
+        )
+        .all(limitStr, now);
+    } catch (e) {
+      console.error('getDueSoon failed:', e);
+      return [];
+    }
+  }
+
   getSettings() {
     try {
       const rows = this.db

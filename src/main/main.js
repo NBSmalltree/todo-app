@@ -465,6 +465,28 @@ function setupIPC() {
     }
   });
 
+  // Quick add todo (from quick add window)
+  ipcMain.handle('db:quickAdd', (e, text) => {
+    if (!text || typeof text !== 'string' || !text.trim()) return { success: false };
+    try {
+      const todo = db.addTodo(text.trim());
+      // Notify float window to refresh
+      if (floatWindow && !floatWindow.isDestroyed()) {
+        floatWindow.webContents.send('data-changed');
+      }
+      return { success: true, todo };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Close quick add window
+  ipcMain.handle('quickadd:close', () => {
+    if (quickAddWindow && !quickAddWindow.isDestroyed()) {
+      quickAddWindow.close();
+    }
+  });
+
   // LLM connection test
   ipcMain.handle('llm:test', async (e, settings) => {
     try {
@@ -741,8 +763,133 @@ if (!gotTheLock) {
     });
     console.log(`Global shortcut registered: ${shortcut}`);
   });
-  
-  // Unregister global shortcuts when app quits
+
+  // Register global shortcut for quick add (Ctrl/Cmd + Shift + Space)
+  const quickAddShortcut = process.platform === 'darwin' ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space';
+  globalShortcut.register(quickAddShortcut, () => {
+    createQuickAddWindow();
+  });
+  console.log(`Quick add shortcut registered: ${quickAddShortcut}`);
+
+  // Start reminder polling (check every 60 seconds)
+  startReminderPolling();
+});
+
+// Reminder polling: check due tasks every 60 seconds
+let reminderTimer = null;
+let remindedTaskIds = new Set(); // track already-reminded tasks to avoid duplicate notifications
+
+function startReminderPolling() {
+  if (reminderTimer) clearInterval(reminderTimer);
+  reminderTimer = setInterval(() => {
+    if (!db) return;
+    try {
+      const settings = db.getSettings();
+      const remindMinutes = settings.remind_minutes != null ? Number(settings.remind_minutes) : 15;
+      if (remindMinutes < 0) return; // disabled
+
+      const dueTasks = db.getDueSoon(remindMinutes);
+      dueTasks.forEach((task) => {
+        if (remindedTaskIds.has(task.id)) return; // already reminded
+        remindedTaskIds.add(task.id);
+
+        const dueStr = task.due_date || '';
+        const body = dueStr ? `任务「${task.text}」将于 ${dueStr} 到期` : `任务「${task.text}」已到期`;
+
+        if (process.platform === 'darwin') {
+          // macOS: use native Notification
+          const { Notification } = require('electron');
+          const notif = new Notification({
+            title: 'TodoFloat 提醒',
+            body,
+            silent: false,
+          });
+          notif.show();
+          notif.on('click', () => {
+            if (floatWindow) {
+              floatWindow.show();
+              floatWindow.focus();
+            }
+          });
+        } else {
+          // Windows: use toast notification via electron
+          const { Notification } = require('electron');
+          const notif = new Notification({
+            title: 'TodoFloat 提醒',
+            body,
+            silent: false,
+          });
+          notif.show();
+        }
+      });
+    } catch (e) {
+      console.error('[Reminder] Polling error:', e.message);
+    }
+  }, 60000); // check every 60 seconds
+}
+
+function stopReminderPolling() {
+  if (reminderTimer) {
+    clearInterval(reminderTimer);
+    reminderTimer = null;
+  }
+}
+
+// Quick Add Window
+let quickAddWindow = null;
+
+function createQuickAddWindow() {
+  if (quickAddWindow && !quickAddWindow.isDestroyed()) {
+    quickAddWindow.focus();
+    return;
+  }
+
+  const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
+  const winWidth = Math.min(400, screenWidth - 40);
+  const winHeight = 52;
+
+  quickAddWindow = new BrowserWindow({
+    width: winWidth,
+    height: winHeight,
+    type: 'toolbar', // makes it appear as a floating tool window
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: true,
+    show: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+
+  // Center on screen
+  quickAddWindow.center();
+
+  quickAddWindow.setAlwaysOnTop(true, 'floating');
+
+  if (isDev()) {
+    quickAddWindow.loadURL('http://localhost:5173#/quickadd');
+  } else {
+    quickAddWindow.loadFile(path.join(__dirname, '../../build/renderer/index.html'), {
+      hash: '/quickadd',
+    });
+  }
+
+  quickAddWindow.once('ready-to-show', () => {
+    quickAddWindow.show();
+    quickAddWindow.focus();
+  });
+
+  quickAddWindow.on('closed', () => {
+    quickAddWindow = null;
+  });
+}
+
+// Unregister global shortcuts when app quits
   app.on('will-quit', () => {
     globalShortcut.unregisterAll();
   });
@@ -768,6 +915,7 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   app.isQuitting = true;
+  stopReminderPolling();
   // Save window bounds and edge state
   if (floatWindow && !floatWindow.isDestroyed()) {
     try {
