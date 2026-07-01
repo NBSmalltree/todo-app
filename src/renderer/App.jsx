@@ -21,8 +21,18 @@ export default function App() {
     };
     window.addEventListener('hashchange', handleHashChange);
 
+    // Keyboard shortcut: Cmd/Ctrl + , to open a separate settings window (macOS and Windows)
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault();
+        window.electronAPI?.openSettingsWindow?.();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
