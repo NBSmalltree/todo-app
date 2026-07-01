@@ -187,9 +187,17 @@ class TodoDatabase {
     }
 
     // Seed default settings if not present
-    const countTheme = this.db.prepare("SELECT COUNT(*) as c FROM settings WHERE key = 'theme'").get();
-    if (countTheme.c === 0) {
-      this.db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('theme', ?)").run(JSON.stringify('light'));
+    const defaults = [
+      ['theme', JSON.stringify('light')],
+      ['shortcut_toggle', JSON.stringify(process.platform === 'darwin' ? 'Cmd+Shift+T' : 'Ctrl+Shift+T')],
+      ['shortcut_quickadd', JSON.stringify(process.platform === 'darwin' ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space')],
+    ];
+    const stmt = this.db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)");
+    for (const [key, value] of defaults) {
+      const existing = this.db.prepare("SELECT COUNT(*) as c FROM settings WHERE key = ?").get(key);
+      if (existing.c === 0) {
+        stmt.run(key, value);
+      }
     }
   }
 

@@ -61,6 +61,9 @@ export default function Settings() {
   const [testResult, setTestResult] = useState(null);
   const [notifTesting, setNotifTesting] = useState(false);
   const [notifResult, setNotifResult] = useState(null);
+  const [shortcutToggle, setShortcutToggle] = useState('');
+  const [shortcutQuickAdd, setShortcutQuickAdd] = useState('');
+  const [recording, setRecording] = useState(null); // 'toggle' | 'quickadd' | null
   const [scale, setScale] = useState(1);
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
@@ -159,6 +162,13 @@ export default function Settings() {
         setRemindMinutes(val >= 0 ? val : 15);
         setRemindEnabled(val >= 0);
       }
+
+      // Load shortcuts
+      try {
+        const shortcuts = await electronAPI.getShortcuts();
+        setShortcutToggle(shortcuts.toggle);
+        setShortcutQuickAdd(shortcuts.quickadd);
+      } catch (e) { /* ignore */ }
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
@@ -536,6 +546,32 @@ export default function Settings() {
                   {notifResult.success ? '已发送，请查看系统通知' : `失败：${notifResult.error}`}
                 </span>
               )}
+            </div>
+          </div>
+
+          {/* Shortcut Settings */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">⌨️ 快捷键</h2>
+            <p className="text-sm text-gray-500 mb-4">自定义全局快捷键，避免与其他应用冲突</p>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+              <ShortcutRecorder
+                label="显示/隐藏主窗口"
+                defaultValue={shortcutToggle}
+                onChange={(val) => {
+                  setShortcutToggle(val);
+                  electronAPI.updateShortcuts({ toggle: val, quickadd: shortcutQuickAdd }).catch(() => {});
+                }}
+              />
+              <ShortcutRecorder
+                label="快捷添加窗口"
+                defaultValue={shortcutQuickAdd}
+                onChange={(val) => {
+                  setShortcutQuickAdd(val);
+                  electronAPI.updateShortcuts({ toggle: shortcutToggle, quickadd: val }).catch(() => {});
+                }}
+              />
+              <p className="text-xs text-gray-400">点击上方按钮，然后按下您想要设置的快捷键组合</p>
             </div>
           </div>
 
@@ -960,6 +996,86 @@ export default function Settings() {
 
         </div>
       </div>
+    </div>
+  );
+}
+
+// ===== ShortcutRecorder Component =====
+function ShortcutRecorder({ label, defaultValue, onChange }) {
+  const [recording, setRecording] = useState(false);
+  const [current, setCurrent] = useState(defaultValue || '');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setCurrent(defaultValue || '');
+  }, [defaultValue]);
+
+  useEffect(() => {
+    if (!recording) return;
+    setError('');
+
+    const handler = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const parts = [];
+      if (e.metaKey) parts.push('Cmd');
+      if (e.ctrlKey) parts.push('Ctrl');
+      if (e.altKey) parts.push('Alt');
+      if (e.shiftKey) parts.push('Shift');
+
+      // Get the main key
+      let key = e.key;
+      if (key === 'Meta' || key === 'Control' || key === 'Alt' || key === 'Shift') return;
+
+      if (key === ' ') key = 'Space';
+      else if (key === 'Escape') { setRecording(false); return; }
+      else if (key.length === 1) key = key.toUpperCase();
+      else {
+        // Named keys: Enter, Tab, Backspace, etc.
+        const validKeys = ['Enter', 'Tab', 'Backspace', 'Delete', 'F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12',
+                          'ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','PageUp','PageDown'];
+        if (!validKeys.includes(key)) return;
+      }
+
+      if (parts.length === 0) {
+        setError('请至少包含一个修饰键（Cmd/Ctrl/Alt/Shift）');
+        return;
+      }
+
+      const combo = [...parts, key].join('+');
+      setCurrent(combo);
+      onChange(combo);
+      setRecording(false);
+    };
+
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [recording, onChange]);
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+      <button
+        type="button"
+        onClick={() => setRecording(true)}
+        className={`w-full px-4 py-2.5 text-sm rounded-lg border text-left transition-all font-mono ${
+          recording
+            ? 'border-sky-400 bg-sky-50 text-sky-600 ring-2 ring-sky-200'
+            : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300'
+        }`}
+      >
+        {recording ? (
+          <span className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-sky-400 rounded-full animate-pulse" />
+            按下快捷键...
+          </span>
+        ) : (
+          current || '未设置'
+        )}
+      </button>
+      {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
+      <p className="text-xs text-gray-400 mt-1">点击后按下快捷键组合，至少包含一个修饰键。按 Esc 取消</p>
     </div>
   );
 }

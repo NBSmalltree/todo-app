@@ -30,6 +30,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('db:getSettings'),
   saveSettings: (settings) => ipcRenderer.invoke('db:saveSettings', settings),
 
+  // Shortcuts
+  getShortcuts: () => ipcRenderer.invoke('shortcuts:get'),
+  updateShortcuts: (shortcuts) => ipcRenderer.invoke('shortcuts:update', shortcuts),
+
   // LLM
   categorize: (text) => ipcRenderer.invoke('llm:categorize', text),
   analyzeWork: (data) => ipcRenderer.invoke('llm:analyzeWork', data),

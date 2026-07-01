@@ -444,6 +444,22 @@ function setupIPC() {
       return { success: false, error: err.message };
     }
   });
+  ipcMain.handle('shortcuts:get', () => {
+    const s = db.getSettings();
+    return {
+      toggle: s.shortcut_toggle || (process.platform === 'darwin' ? 'Cmd+Shift+T' : 'Ctrl+Shift+T'),
+      quickadd: s.shortcut_quickadd || (process.platform === 'darwin' ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space'),
+    };
+  });
+  ipcMain.handle('shortcuts:update', async (e, { toggle, quickadd }) => {
+    try {
+      db.saveSettings({ shortcut_toggle: toggle, shortcut_quickadd: quickadd });
+      registerShortcuts();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
   ipcMain.handle('db:saveSettings', (e, settings) => {
     if (!settings || typeof settings !== 'object') {
       return { success: false, error: 'Invalid settings' };
@@ -819,36 +835,51 @@ if (!gotTheLock) {
     createFloatWindow();
     createTray();
     
-    // Register global shortcut: Ctrl+Shift+T (Cmd+Shift+T on macOS)
-    const shortcut = process.platform === 'darwin' ? 'Cmd+Shift+T' : 'Ctrl+Shift+T';
-    globalShortcut.register(shortcut, () => {
+    // Register global shortcuts from settings
+    registerShortcuts();
+
+    // Start reminder polling (check every 60 seconds)
+    startReminderPolling();
+  });
+
+// ===== Global Shortcuts =====
+function registerShortcuts() {
+  if (!db) return;
+  globalShortcut.unregisterAll();
+
+  const settings = db.getSettings();
+  const toggleShortcut = settings.shortcut_toggle || (process.platform === 'darwin' ? 'Cmd+Shift+T' : 'Ctrl+Shift+T');
+  const quickAddShortcut = settings.shortcut_quickadd || (process.platform === 'darwin' ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space');
+
+  try {
+    globalShortcut.register(toggleShortcut, () => {
       if (floatWindow) {
         if (floatWindow.isVisible() && !floatWindow.isMinimized()) {
-          // If window is visible and not minimized, hide it
           if (edgeManager && edgeManager.state === 'HIDDEN') {
             edgeManager.showWindow();
           } else {
             floatWindow.hide();
           }
         } else {
-          // If window is hidden or minimized, show and focus it
           floatWindow.show();
           floatWindow.focus();
         }
       }
     });
-    console.log(`Global shortcut registered: ${shortcut}`);
+    console.log(`[Shortcuts] Toggle registered: ${toggleShortcut}`);
+  } catch (e) {
+    console.error(`[Shortcuts] Failed to register toggle shortcut "${toggleShortcut}":`, e.message);
+  }
 
-    // Register global shortcut for quick add (Ctrl/Cmd + Shift + Space)
-    const quickAddShortcut = process.platform === 'darwin' ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space';
+  try {
     globalShortcut.register(quickAddShortcut, () => {
       createQuickAddWindow();
     });
-    console.log(`Quick add shortcut registered: ${quickAddShortcut}`);
-
-    // Start reminder polling (check every 60 seconds)
-    startReminderPolling();
-  });
+    console.log(`[Shortcuts] Quick add registered: ${quickAddShortcut}`);
+  } catch (e) {
+    console.error(`[Shortcuts] Failed to register quick add shortcut "${quickAddShortcut}":`, e.message);
+  }
+}
 
 // ===== Pomodoro Timer =====
 const POMODORO_DEFAULTS = {
