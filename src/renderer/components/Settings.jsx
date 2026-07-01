@@ -84,6 +84,18 @@ export default function Settings() {
     return () => window.removeEventListener('wheel', handleWheel, { passive: false });
   }, []);
 
+  // Press Escape to close settings window
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        window.electronAPI?.closeWindow();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Apply scale to root font size
   useEffect(() => {
     document.documentElement.style.fontSize = `${scale * 16}px`;
