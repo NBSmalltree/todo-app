@@ -7,6 +7,7 @@ const EdgeManager = require('./edgeManager');
 let floatWindow = null;
 let trayWindow = null;
 let settingsWindow = null;
+let quickAddWindow = null;
 let tray = null;
 let db = null;
 let edgeManager = null;
@@ -697,7 +698,7 @@ function setupIPC() {
 
   // Apply theme to all windows
   ipcMain.handle('window:applyTheme', (e, theme) => {
-    [floatWindow, trayWindow, settingsWindow].forEach((win) => {
+    [floatWindow, trayWindow, settingsWindow, quickAddWindow].forEach((win) => {
       try {
         if (win && !win.isDestroyed()) {
           win.webContents.send('theme-changed', theme);
@@ -762,18 +763,17 @@ if (!gotTheLock) {
       }
     });
     console.log(`Global shortcut registered: ${shortcut}`);
-  });
 
-  // Register global shortcut for quick add (Ctrl/Cmd + Shift + Space)
-  const quickAddShortcut = process.platform === 'darwin' ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space';
-  globalShortcut.register(quickAddShortcut, () => {
-    createQuickAddWindow();
-  });
-  console.log(`Quick add shortcut registered: ${quickAddShortcut}`);
+    // Register global shortcut for quick add (Ctrl/Cmd + Shift + Space)
+    const quickAddShortcut = process.platform === 'darwin' ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space';
+    globalShortcut.register(quickAddShortcut, () => {
+      createQuickAddWindow();
+    });
+    console.log(`Quick add shortcut registered: ${quickAddShortcut}`);
 
-  // Start reminder polling (check every 60 seconds)
-  startReminderPolling();
-});
+    // Start reminder polling (check every 60 seconds)
+    startReminderPolling();
+  });
 
 // Reminder polling: check due tasks every 60 seconds
 let reminderTimer = null;
@@ -788,6 +788,16 @@ function startReminderPolling() {
       const remindMinutes = settings.remind_minutes != null ? Number(settings.remind_minutes) : 15;
       if (remindMinutes < 0) return; // disabled
 
+      // Clean up remindedTaskIds: remove IDs that no longer exist or are completed/archived
+      try {
+        const activeIds = new Set(
+          db.db.prepare('SELECT id FROM todos WHERE archived = 0 AND completed = 0').pluck().all()
+        );
+        for (const id of remindedTaskIds) {
+          if (!activeIds.has(id)) remindedTaskIds.delete(id);
+        }
+      } catch { /* ignore */ }
+
       const dueTasks = db.getDueSoon(remindMinutes);
       dueTasks.forEach((task) => {
         if (remindedTaskIds.has(task.id)) return; // already reminded
@@ -796,34 +806,38 @@ function startReminderPolling() {
         const dueStr = task.due_date || '';
         const body = dueStr ? `任务「${task.text}」将于 ${dueStr} 到期` : `任务「${task.text}」已到期`;
 
-        if (process.platform === 'darwin') {
-          // macOS: use native Notification
-          const { Notification } = require('electron');
-          const notif = new Notification({
-            title: 'TodoFloat 提醒',
-            body,
-            silent: false,
-          });
-          notif.show();
-          notif.on('click', () => {
-            if (floatWindow) {
-              floatWindow.show();
-              floatWindow.focus();
-            }
-          });
-        } else {
-          // Windows: use toast notification via electron
-          const { Notification } = require('electron');
-          const notif = new Notification({
-            title: 'TodoFloat 提醒',
-            body,
-            silent: false,
-          });
-          notif.show();
-        }
+        try {
+          if (process.platform === 'darwin') {
+            // macOS: use native Notification
+            const { Notification } = require('electron');
+            const notif = new Notification({
+              title: 'TodoFloat 提醒',
+              body,
+              silent: false,
+            });
+            notif.show();
+            notif.on('click', () => {
+              try {
+                if (floatWindow && !floatWindow.isDestroyed()) {
+                  floatWindow.show();
+                  floatWindow.focus();
+                }
+              } catch { /* ignore */ }
+            });
+          } else {
+            // Windows: use toast notification via electron
+            const { Notification } = require('electron');
+            const notif = new Notification({
+              title: 'TodoFloat 提醒',
+              body,
+              silent: false,
+            });
+            notif.show();
+          }
+        } catch { /* swallow EPIPE or other notification errors */ }
       });
     } catch (e) {
-      console.error('[Reminder] Polling error:', e.message);
+      try { console.error('[Reminder] Polling error:', e.message); } catch {}
     }
   }, 60000); // check every 60 seconds
 }
@@ -836,8 +850,6 @@ function stopReminderPolling() {
 }
 
 // Quick Add Window
-let quickAddWindow = null;
-
 function createQuickAddWindow() {
   if (quickAddWindow && !quickAddWindow.isDestroyed()) {
     quickAddWindow.focus();
@@ -845,8 +857,8 @@ function createQuickAddWindow() {
   }
 
   const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
-  const winWidth = Math.min(400, screenWidth - 40);
-  const winHeight = 52;
+  const winWidth = Math.min(440, screenWidth - 40);
+  const winHeight = 80;
 
   quickAddWindow = new BrowserWindow({
     width: winWidth,
@@ -880,6 +892,19 @@ function createQuickAddWindow() {
   }
 
   quickAddWindow.once('ready-to-show', () => {
+    // Apply current theme to the newly created window via executeJavaScript,
+    // which is more reliable than sending an event (renderer may not have
+    // registered the listener yet when the event arrives).
+    try {
+      const settings = db.getSettings();
+      const theme = (settings?.theme && ['light', 'dark', 'eye-care'].includes(settings.theme))
+        ? settings.theme
+        : 'light';
+      quickAddWindow.webContents.executeJavaScript(
+        `document.documentElement.setAttribute('data-theme', '${theme}')`
+      ).catch(() => {});
+    } catch (e) { /* ignore */ }
+
     quickAddWindow.show();
     quickAddWindow.focus();
   });

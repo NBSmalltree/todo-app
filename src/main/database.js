@@ -105,6 +105,17 @@ class TodoDatabase {
         version: 4,
         sql: 'ALTER TABLE todos ADD COLUMN due_date TEXT',
       },
+      {
+        version: 5,
+        sql: 'SELECT 1', // no-op, done in after()
+        after: () => {
+          // Migrate existing date-only due_date values (YYYY-MM-DD) to datetime (YYYY-MM-DD 23:59:59)
+          this.db.exec(`
+            UPDATE todos SET due_date = due_date || ' 23:59:59'
+            WHERE due_date IS NOT NULL AND due_date != '' AND LENGTH(due_date) = 10
+          `);
+        },
+      },
     ];
 
     const insertVersion = this.db.prepare('INSERT OR IGNORE INTO schema_version (version) VALUES (?)');
@@ -123,6 +134,12 @@ class TodoDatabase {
           console.error(`Migration v${migration.version} failed:`, e.message);
         }
       }
+    }
+
+    // Seed default settings if not present
+    const countTheme = this.db.prepare("SELECT COUNT(*) as c FROM settings WHERE key = 'theme'").get();
+    if (countTheme.c === 0) {
+      this.db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('theme', ?)").run(JSON.stringify('light'));
     }
   }
 
@@ -392,7 +409,7 @@ class TodoDatabase {
       const limitTime = new Date(nowDate.getTime() + withinMinutes * 60 * 1000);
       const limitStr = limitTime.toISOString().replace('T', ' ').slice(0, 19);
 
-      return this.db
+      const rows = this.db
         .prepare(
           `SELECT * FROM todos
            WHERE archived = 0 AND completed = 0
@@ -401,8 +418,9 @@ class TodoDatabase {
            ORDER BY due_date ASC`
         )
         .all(limitStr, now);
+      return rows;
     } catch (e) {
-      console.error('getDueSoon failed:', e);
+      try { console.error('getDueSoon failed:', e); } catch {}
       return [];
     }
   }

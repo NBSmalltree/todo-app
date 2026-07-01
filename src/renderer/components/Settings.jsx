@@ -89,10 +89,14 @@ export default function Settings() {
     document.documentElement.style.fontSize = `${scale * 16}px`;
   }, [scale]);
 
-  // Apply theme whenever it changes
+  // Apply theme whenever it changes, and persist it immediately
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    try { electronAPI?.applyTheme(theme); } catch (e) { /* ignore */ }
+    try {
+      electronAPI?.applyTheme(theme);
+      // Persist theme immediately so other windows read the correct value from DB
+      electronAPI?.saveSettings({ theme });
+    } catch (e) { /* ignore */ }
   }, [theme]);
 
   // Apply opacity whenever it changes
@@ -394,9 +398,9 @@ export default function Settings() {
               {remindEnabled && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    提前提醒时间: {remindMinutes} 分钟
+                    提前提醒时间
                   </label>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
                     <input
                       type="range"
                       min="0"
@@ -409,14 +413,37 @@ export default function Settings() {
                       }}
                       className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
                     />
-                    <span className="text-sm text-gray-600 w-20 text-right">
-                      {remindMinutes >= 60
-                        ? `${Math.floor(remindMinutes / 60)}小时`
-                        : `${remindMinutes}分钟`}
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={remindMinutes}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          if (val === '') return;
+                          const num = Math.min(1440, Math.max(0, Number(val)));
+                          setRemindMinutes(num);
+                          handleRemindChange(num);
+                        }}
+                        onBlur={(e) => {
+                          let val = e.target.value.replace(/[^0-9]/g, '');
+                          if (val === '' || Number(val) < 0) val = '0';
+                          if (Number(val) > 1440) val = '1440';
+                          const num = Number(val);
+                          setRemindMinutes(num);
+                          handleRemindChange(num);
+                        }}
+                        className="w-16 px-2 py-1 text-xs text-center bg-white rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-sky-200"
+                      />
+                      <span className="text-xs text-gray-500 w-8">
+                        {remindMinutes >= 60
+                          ? `${Math.floor(remindMinutes / 60)}h`
+                          : 'min'}
+                      </span>
+                    </div>
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
-                    0 = 准时提醒，最大提前 24 小时（1440 分钟）
+                    可拖动滑块或手动输入，0 = 准时提醒，最大 1440 分钟（24 小时）
                   </p>
                 </div>
               )}

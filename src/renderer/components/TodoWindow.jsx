@@ -18,6 +18,7 @@ export default function TodoWindow() {
     const [editingId, setEditingId] = useState(null);    // 正在编辑的 todo id
     const [editText, setEditText] = useState('');          // 编辑中的文本
     const [datePickerId, setDatePickerId] = useState(null); // 正在设置截止日期的 todo id
+    const [pendingDueDate, setPendingDueDate] = useState(''); // 日期选择器中的临时值（受控输入）
     const datePickerRef = useRef(null);                     // 日期选择器容器 ref
     const [selectMode, setSelectMode] = useState(false);       // 批量选择模式
     const [selectedIds, setSelectedIds] = useState(new Set());  // 已选中的 todo id
@@ -145,12 +146,12 @@ export default function TodoWindow() {
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (datePickerId !== null) {
-        // Check if click is inside the date picker or the date badge/icon area
         const clickedInPicker = e.target.closest('[data-date-picker="true"]') !== null;
         const clickedInToggle = e.target.closest('[data-date-toggle]') !== null;
-        
+
         if (!clickedInPicker && !clickedInToggle) {
           setDatePickerId(null);
+          setPendingDueDate('');
         }
       }
     };
@@ -158,6 +159,23 @@ export default function TodoWindow() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [datePickerId]);
+
+  // Initialize pendingDueDate when datePickerId changes
+  useEffect(() => {
+    if (datePickerId === null) return;
+    const todo = todos.find((t) => t.id === datePickerId);
+    if (!todo) return;
+    if (todo.due_date) {
+      const d = todo.due_date;
+      let val = '';
+      if (d.includes('T')) val = d.slice(0, 16);
+      else if (d.length >= 16) val = d.slice(0, 16).replace(' ', 'T');
+      else if (d.length === 10) val = d + 'T23:59';
+      setPendingDueDate(val);
+    } else {
+      setPendingDueDate('');
+    }
+  }, [datePickerId, todos]);
 
   // Global shortcut: Ctrl/Cmd+F to focus search
   useEffect(() => {
@@ -373,13 +391,29 @@ export default function TodoWindow() {
     setEditText('');
   };
 
-  const handleSetDueDate = async (id, dateStr) => {
+  const handleConfirmDueDate = async (id) => {
     try {
-      await electronAPI.setDueDate(id, dateStr || null);
+      let storeStr = pendingDueDate || null;
+      if (storeStr && storeStr.includes('T')) {
+        storeStr = storeStr.replace('T', ' ') + ':00';
+      }
+      await electronAPI.setDueDate(id, storeStr);
       setDatePickerId(null);
+      setPendingDueDate('');
       await loadTodos();
     } catch (error) {
       console.error('Failed to set due date:', error);
+    }
+  };
+
+  const handleClearDueDate = async (id) => {
+    try {
+      await electronAPI.setDueDate(id, null);
+      setDatePickerId(null);
+      setPendingDueDate('');
+      await loadTodos();
+    } catch (error) {
+      console.error('Failed to clear due date:', error);
     }
   };
 
@@ -716,15 +750,19 @@ export default function TodoWindow() {
                   data-date-toggle={todo.id}
                   onClick={() => setDatePickerId(datePickerId === todo.id ? null : todo.id)}
                   className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium cursor-pointer hover:opacity-80 transition-opacity ${
-                    todo.due_date < new Date().toISOString().slice(0, 10)
+                    todo.due_date < new Date().toISOString().slice(0, 16).replace('T', ' ')
                       ? 'bg-red-100 text-red-600'
-                      : todo.due_date === new Date().toISOString().slice(0, 10)
-                      ? 'bg-yellow-100 text-yellow-700'
                       : 'bg-gray-100 text-gray-500'
                   }`}
                   title="点击设置截止日期"
                 >
-                  {todo.due_date.slice(5).replace('-', '/')}
+                  {(() => {
+                    const d = todo.due_date;
+                    // d is "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD"
+                    const datePart = d.slice(5, 10).replace('-', '/');
+                    const timePart = d.length > 10 ? ' ' + d.slice(11, 16) : '';
+                    return datePart + timePart;
+                  })()}
                 </span>
               )}
               {/* Calendar icon: set due date */}
@@ -756,15 +794,21 @@ export default function TodoWindow() {
             {datePickerId === todo.id && (
               <div ref={datePickerRef} data-date-picker="true" className="px-2 py-1.5 bg-gray-50 rounded-b-lg flex items-center gap-2 border-t border-gray-100">
                 <input
-                  type="date"
-                  defaultValue={todo.due_date || ''}
-                  onChange={(e) => handleSetDueDate(todo.id, e.target.value || null)}
+                  type="datetime-local"
+                  value={pendingDueDate}
+                  onChange={(e) => setPendingDueDate(e.target.value)}
                   className="flex-1 px-2 py-1 text-xs bg-white rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-sky-200"
                 />
+                <button
+                  onClick={() => handleConfirmDueDate(todo.id)}
+                  className="px-2 py-1 text-xs text-white bg-sky-500 hover:bg-sky-600 rounded transition-colors font-medium shrink-0"
+                >
+                  确认
+                </button>
                 {todo.due_date && (
                   <button
-                    onClick={() => handleSetDueDate(todo.id, null)}
-                    className="px-2 py-1 text-xs text-red-500 hover:bg-red-100 rounded transition-colors"
+                    onClick={() => handleClearDueDate(todo.id)}
+                    className="px-2 py-1 text-xs text-red-500 hover:bg-red-100 rounded transition-colors shrink-0"
                   >
                     清除
                   </button>
