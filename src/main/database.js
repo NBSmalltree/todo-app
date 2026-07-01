@@ -405,7 +405,7 @@ class TodoDatabase {
     try {
       // 查询未完成的、设置了截止日期的、且截止时间在 N 分钟内的任务
       const now = nowBeijing();
-      const nowDate = new Date(now.replace(' ', 'T') + ':00');
+      const nowDate = new Date(now.replace(' ', 'T') + '+08:00');
       const limitTime = new Date(nowDate.getTime() + withinMinutes * 60 * 1000);
       const limitStr = limitTime.toISOString().replace('T', ' ').slice(0, 19);
 
