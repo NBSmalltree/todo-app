@@ -376,8 +376,8 @@ function setupIPC() {
   });
   ipcMain.handle('db:setDueDate', (e, id, dueDate) => {
     if (!isPositiveInt(id)) return null;
-    // Validate dueDate format (YYYY-MM-DD) or allow null
-    if (dueDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return { success: false, error: 'Invalid date format' };
+    // Validate dueDate format (YYYY-MM-DD or YYYY-MM-DD HH:MM or YYYY-MM-DD HH:MM:SS) or allow null
+    if (dueDate !== null && !/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/.test(dueDate)) return { success: false, error: 'Invalid date format' };
     return db.setDueDate(id, dueDate);
   });
   ipcMain.handle('db:getCategories', () => db.getCategories());
