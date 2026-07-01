@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   // Database operations
   getTodos: () => ipcRenderer.invoke('db:getTodos'),
+  getActiveTodos: () => ipcRenderer.invoke('db:getActiveTodos'),
+  getFutureScheduledTodos: () => ipcRenderer.invoke('db:getFutureScheduledTodos'),
   addTodo: (text) => ipcRenderer.invoke('db:addTodo', text),
   toggleTodo: (id) => ipcRenderer.invoke('db:toggleTodo', id),
   deleteTodo: (id) => ipcRenderer.invoke('db:deleteTodo', id),
@@ -12,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateNote: (id, note) => ipcRenderer.invoke('db:updateNote', id, note),
   updateCategory: (id, category) => ipcRenderer.invoke('db:updateCategory', id, category),
   setDueDate: (id, dueDate) => ipcRenderer.invoke('db:setDueDate', id, dueDate),
+  setScheduledDate: (id, dateStr) => ipcRenderer.invoke('db:setScheduledDate', id, dateStr),
   getCategories: () => ipcRenderer.invoke('db:getCategories'),
   reorder: (orders) => ipcRenderer.invoke('db:reorder', orders),
   updateColor: (id, color) => ipcRenderer.invoke('db:updateColor', id, color),

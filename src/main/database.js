@@ -162,6 +162,10 @@ class TodoDatabase {
           )
         `,
       },
+      {
+        version: 8,
+        sql: "ALTER TABLE todos ADD COLUMN scheduled_date TEXT",
+      },
     ];
 
     const insertVersion = this.db.prepare('INSERT OR IGNORE INTO schema_version (version) VALUES (?)');
@@ -196,6 +200,42 @@ class TodoDatabase {
         .all();
     } catch (e) {
       console.error('getTodos failed:', e);
+      return [];
+    }
+  }
+
+  // 仅返回活跃（不含未来计划）的任务
+  getActiveTodos() {
+    try {
+      const today = nowBeijing().slice(0, 10);
+      return this.db
+        .prepare(
+          `SELECT * FROM todos
+           WHERE archived = 0
+             AND (scheduled_date IS NULL OR scheduled_date <= ?)
+           ORDER BY completed ASC, sort_order ASC, created_at DESC`
+        )
+        .all(today);
+    } catch (e) {
+      console.error('getActiveTodos failed:', e);
+      return [];
+    }
+  }
+
+  // 返回未来计划的任务
+  getFutureScheduledTodos() {
+    try {
+      const today = nowBeijing().slice(0, 10);
+      return this.db
+        .prepare(
+          `SELECT * FROM todos
+           WHERE archived = 0 AND completed = 0
+             AND scheduled_date IS NOT NULL AND scheduled_date > ?
+           ORDER BY scheduled_date ASC, sort_order ASC`
+        )
+        .all(today);
+    } catch (e) {
+      console.error('getFutureScheduledTodos failed:', e);
       return [];
     }
   }
@@ -362,6 +402,16 @@ class TodoDatabase {
       return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
     } catch (e) {
       console.error('setDueDate failed:', e);
+      return null;
+    }
+  }
+
+  setScheduledDate(id, dateStr) {
+    try {
+      this.db.prepare('UPDATE todos SET scheduled_date = ? WHERE id = ?').run(dateStr || null, id);
+      return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('setScheduledDate failed:', e);
       return null;
     }
   }

@@ -312,6 +312,8 @@ function isPositiveInt(v) {
 function setupIPC() {
   // Database operations
   ipcMain.handle('db:getTodos', () => db.getTodos());
+  ipcMain.handle('db:getActiveTodos', () => db.getActiveTodos());
+  ipcMain.handle('db:getFutureScheduledTodos', () => db.getFutureScheduledTodos());
   ipcMain.handle('db:addTodo', (e, text) => {
     if (!isNonEmptyString(text)) return { success: false, error: 'Invalid text' };
     return db.addTodo(text.trim());
@@ -379,6 +381,12 @@ function setupIPC() {
     // Validate dueDate format (YYYY-MM-DD or YYYY-MM-DD HH:MM or YYYY-MM-DD HH:MM:SS) or allow null
     if (dueDate !== null && !/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/.test(dueDate)) return { success: false, error: 'Invalid date format' };
     return db.setDueDate(id, dueDate);
+  });
+  ipcMain.handle('db:setScheduledDate', (e, id, dateStr) => {
+    if (!isPositiveInt(id)) return null;
+    // Allow YYYY-MM-DD or null
+    if (dateStr !== null && !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return { success: false, error: 'Invalid date format' };
+    return db.setScheduledDate(id, dateStr);
   });
   ipcMain.handle('db:getCategories', () => db.getCategories());
   ipcMain.handle('db:reorder', (e, orders) => {

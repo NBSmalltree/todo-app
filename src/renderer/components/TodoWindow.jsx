@@ -29,6 +29,10 @@ export default function TodoWindow() {
   const [expandedSubtaskIds, setExpandedSubtaskIds] = useState(new Set());
   const [subtaskData, setSubtaskData] = useState({});   // todoId → subtask[]
   const [newSubtaskText, setNewSubtaskText] = useState({}); // todoId → text
+  // Future scheduled tasks
+  const [futureTodos, setFutureTodos] = useState([]);
+  const [showFutureSection, setShowFutureSection] = useState(false);
+  const [scheduledPickerId, setScheduledPickerId] = useState(null); // todo id being scheduled
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const editInputRef = useRef(null);
@@ -162,8 +166,12 @@ export default function TodoWindow() {
 
   const loadTodos = async () => {
     try {
-      const data = await electronAPI.getTodos();
+      const [data, futureData] = await Promise.all([
+        electronAPI.getActiveTodos(),
+        electronAPI.getFutureScheduledTodos(),
+      ]);
       setTodos(data);
+      setFutureTodos(futureData);
     } catch (error) {
       console.error('Failed to load todos:', error);
     }
@@ -372,6 +380,17 @@ export default function TodoWindow() {
 
   const handleCloseDueDatePicker = () => {
     setDatePickerId(null);
+  };
+
+  // Scheduled date handlers
+  const handleSetScheduledDate = async (id, dateStr) => {
+    try {
+      await electronAPI.setScheduledDate(id, dateStr || null);
+      setScheduledPickerId(null);
+      await loadTodos();
+    } catch (error) {
+      console.error('Failed to set scheduled date:', error);
+    }
   };
 
   // === Subtask handlers ===
@@ -788,6 +807,33 @@ export default function TodoWindow() {
                   </svg>
                 </button>
               )}
+              {/* Scheduled date badge */}
+              {!editingId && todo.scheduled_date && (
+                <span className="flex-shrink-0 text-[10px] text-amber-500 bg-amber-50 px-1 py-0.5 rounded font-medium">
+                  📅 {todo.scheduled_date.slice(5, 10).replace('-', '/')}
+                </span>
+              )}
+              {/* Scheduled date icon */}
+              {!editingId && (
+                <button
+                  onClick={() => setScheduledPickerId(scheduledPickerId === todo.id ? null : todo.id)}
+                  className={`flex-shrink-0 w-5 h-5 flex items-center justify-center rounded transition-all group-hover:opacity-100 ${
+                    scheduledPickerId === todo.id
+                      ? 'opacity-100 text-amber-500 hover:bg-amber-50'
+                      : 'opacity-0 text-gray-300 hover:text-amber-400'
+                  }`}
+                  title={todo.scheduled_date ? '修改计划日期' : '设置计划日期'}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                    <line x1="12" y1="14" x2="12" y2="18" />
+                    <line x1="10" y1="16" x2="14" y2="16" />
+                  </svg>
+                </button>
+              )}
               {/* Subtask expand button */}
               {!editingId && (
                 <button
@@ -890,6 +936,29 @@ export default function TodoWindow() {
                 onClose={handleCloseDueDatePicker}
               />
             )}
+
+            {/* Inline scheduled date picker */}
+            {scheduledPickerId === todo.id && (
+              <div className="px-2 py-1.5">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={todo.scheduled_date || ''}
+                    onChange={(e) => handleSetScheduledDate(todo.id, e.target.value)}
+                    className="flex-1 px-2 py-1 text-xs bg-white rounded border border-amber-200 focus:outline-none focus:ring-1 focus:ring-amber-200"
+                  />
+                  {todo.scheduled_date && (
+                    <button
+                      onClick={() => handleSetScheduledDate(todo.id, null)}
+                      className="text-[11px] text-red-400 hover:text-red-500 px-1.5"
+                    >
+                      清除
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">选择开始日期，到期前不会出现在待办列表</p>
+              </div>
+            )}
           </div>
           );
         })}
@@ -950,6 +1019,49 @@ export default function TodoWindow() {
             </button>
           </div>
         ))}
+
+        {/* Future scheduled tasks section */}
+        {futureTodos.length > 0 && (
+          <div className="mt-1 border-t border-amber-100">
+            <button
+              onClick={() => setShowFutureSection(!showFutureSection)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-amber-50/50 transition-colors rounded"
+            >
+              <span className="text-[10px]">📅</span>
+              <span className="text-xs font-medium text-amber-600">计划 {futureTodos.length} 项</span>
+              <svg
+                className={`w-3 h-3 ml-auto text-amber-400 transition-transform ${showFutureSection ? 'rotate-180' : ''}`}
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            {showFutureSection && (
+              <div className="pb-1">
+                {futureTodos.map((ft) => (
+                  <div key={ft.id} className="flex items-center gap-2 px-2 py-1 rounded-lg group cursor-default">
+                    <div className="w-4 h-4 rounded-full border-2 border-amber-200 flex-shrink-0" />
+                    <span className="flex-1 text-[11px] text-gray-500 truncate">{ft.text}</span>
+                    <span className="text-[10px] text-amber-400 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
+                      {(ft.scheduled_date || '').slice(5, 10).replace('-', '/')}
+                    </span>
+                    <button
+                      onClick={() => {
+                        handleSetScheduledDate(ft.id, null);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 w-4 h-4 flex items-center justify-center rounded hover:bg-amber-50 text-gray-300 hover:text-amber-500 transition-all"
+                      title="移除计划日期"
+                    >
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Empty state */}
         {todos.length === 0 && (
