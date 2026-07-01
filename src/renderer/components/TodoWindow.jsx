@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import DueDatePicker from './DueDatePicker';
 
 const { electronAPI } = window;
 
@@ -18,8 +19,6 @@ export default function TodoWindow() {
     const [editingId, setEditingId] = useState(null);    // 正在编辑的 todo id
     const [editText, setEditText] = useState('');          // 编辑中的文本
     const [datePickerId, setDatePickerId] = useState(null); // 正在设置截止日期的 todo id
-    const [pendingDueDate, setPendingDueDate] = useState(''); // 日期选择器中的临时值（受控输入）
-    const datePickerRef = useRef(null);                     // 日期选择器容器 ref
     const [selectMode, setSelectMode] = useState(false);       // 批量选择模式
     const [selectedIds, setSelectedIds] = useState(new Set());  // 已选中的 todo id
     const [edgeState, setEdgeState] = useState({ snapped: false, edge: null, hidden: false });
@@ -141,41 +140,6 @@ export default function TodoWindow() {
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
   }, []);
-
-  // Close date picker when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (datePickerId !== null) {
-        const clickedInPicker = e.target.closest('[data-date-picker="true"]') !== null;
-        const clickedInToggle = e.target.closest('[data-date-toggle]') !== null;
-
-        if (!clickedInPicker && !clickedInToggle) {
-          setDatePickerId(null);
-          setPendingDueDate('');
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [datePickerId]);
-
-  // Initialize pendingDueDate when datePickerId changes
-  useEffect(() => {
-    if (datePickerId === null) return;
-    const todo = todos.find((t) => t.id === datePickerId);
-    if (!todo) return;
-    if (todo.due_date) {
-      const d = todo.due_date;
-      let val = '';
-      if (d.includes('T')) val = d.slice(0, 16);
-      else if (d.length >= 16) val = d.slice(0, 16).replace(' ', 'T');
-      else if (d.length === 10) val = d + 'T23:59';
-      setPendingDueDate(val);
-    } else {
-      setPendingDueDate('');
-    }
-  }, [datePickerId, todos]);
 
   // Global shortcut: Ctrl/Cmd+F to focus search
   useEffect(() => {
@@ -391,30 +355,18 @@ export default function TodoWindow() {
     setEditText('');
   };
 
-  const handleConfirmDueDate = async (id) => {
+  const handleChangeDueDate = async (id, dueDate) => {
     try {
-      let storeStr = pendingDueDate || null;
-      if (storeStr && storeStr.includes('T')) {
-        storeStr = storeStr.replace('T', ' ') + ':00';
-      }
-      await electronAPI.setDueDate(id, storeStr);
-      setDatePickerId(null);
-      setPendingDueDate('');
+      await electronAPI.setDueDate(id, dueDate);
+      // 实时保存后刷新列表，但不关闭选择器（用户可能还要继续微调）
       await loadTodos();
     } catch (error) {
       console.error('Failed to set due date:', error);
     }
   };
 
-  const handleClearDueDate = async (id) => {
-    try {
-      await electronAPI.setDueDate(id, null);
-      setDatePickerId(null);
-      setPendingDueDate('');
-      await loadTodos();
-    } catch (error) {
-      console.error('Failed to clear due date:', error);
-    }
+  const handleCloseDueDatePicker = () => {
+    setDatePickerId(null);
   };
 
   const handleEditKeyDown = (e, id) => {
@@ -792,28 +744,11 @@ export default function TodoWindow() {
             </div>
             {/* Inline date picker */}
             {datePickerId === todo.id && (
-              <div ref={datePickerRef} data-date-picker="true" className="px-2 py-1.5 bg-gray-50 rounded-b-lg flex items-center gap-2 border-t border-gray-100">
-                <input
-                  type="datetime-local"
-                  value={pendingDueDate}
-                  onChange={(e) => setPendingDueDate(e.target.value)}
-                  className="flex-1 px-2 py-1 text-xs bg-white rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-sky-200"
-                />
-                <button
-                  onClick={() => handleConfirmDueDate(todo.id)}
-                  className="px-2 py-1 text-xs text-white bg-sky-500 hover:bg-sky-600 rounded transition-colors font-medium shrink-0"
-                >
-                  确认
-                </button>
-                {todo.due_date && (
-                  <button
-                    onClick={() => handleClearDueDate(todo.id)}
-                    className="px-2 py-1 text-xs text-red-500 hover:bg-red-100 rounded transition-colors shrink-0"
-                  >
-                    清除
-                  </button>
-                )}
-              </div>
+              <DueDatePicker
+                value={todo.due_date}
+                onChange={(newVal) => handleChangeDueDate(todo.id, newVal)}
+                onClose={handleCloseDueDatePicker}
+              />
             )}
           </div>
           );
