@@ -15,7 +15,6 @@
 html,
 body {
   height: 100%;
-  font-family: var(--app-font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: transparent;

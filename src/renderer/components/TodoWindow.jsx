@@ -95,11 +95,6 @@ export default function TodoWindow() {
       setOpacity(v);
     });
 
-    // Listen for font family changes from settings
-    electronAPI?.onFontFamilyChanged?.((font) => {
-      applyFontFamily(font);
-    });
-
     // Listen for edge state changes (ordered by seq to avoid stale notifications)
     electronAPI?.onEdgeStateChanged?.((state) => {
       if ((state.seq || 0) >= edgeSeqRef.current) {

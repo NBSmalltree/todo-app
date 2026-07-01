@@ -76,10 +76,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('pomodoro:stateChanged', handler);
   },
 
-  // Font family
-  applyFontFamily: (font) => ipcRenderer.invoke('window:applyFontFamily', font),
-
-  // Edge management
+  // Theme
   toggleEdgeHide: () => ipcRenderer.invoke('edge:toggleHide'),
   getEdgeSettings: () => ipcRenderer.invoke('edge:getSettings'),
   saveEdgeSettings: (settings) => ipcRenderer.invoke('edge:saveSettings', settings),
@@ -103,11 +100,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (e, theme) => callback(theme);
     ipcRenderer.on('theme-changed', handler);
     return () => ipcRenderer.removeListener('theme-changed', handler);
-  },
-  onFontFamilyChanged: (callback) => {
-    const handler = (e, font) => callback(font);
-    ipcRenderer.on('font-family-changed', handler);
-    return () => ipcRenderer.removeListener('font-family-changed', handler);
   },
   onDataChanged: (callback) => {
     const handler = () => callback();

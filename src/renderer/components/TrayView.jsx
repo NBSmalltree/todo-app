@@ -34,20 +34,6 @@ export default function TrayView() {
   const [isMaximized, setIsMaximized] = useState(false);
   const [pomodoroState, setPomodoroState] = useState(null);
 
-  // Apply font family
-  const applyFontFamily = (font) => {
-    const fontMap = {
-      system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif",
-      sans: "'Helvetica Neue', Arial, 'Noto Sans SC', sans-serif",
-      serif: "Georgia, 'Noto Serif SC', serif",
-      mono: "'SF Mono', Monaco, 'Courier New', 'Noto Sans SC', monospace",
-      pingfang: "'PingFang SC', 'Helvetica Neue', Arial, sans-serif",
-      microsoft: "'Microsoft YaHei', 'Segoe UI', Arial, sans-serif",
-    };
-    const fontFamilyValue = fontMap[font] || fontMap.system;
-    document.documentElement.style.setProperty('--app-font-family', fontFamilyValue);
-  };
-
   // Load theme on mount, listen for changes
   useEffect(() => {
     const loadTheme = async () => {
@@ -56,22 +42,12 @@ export default function TrayView() {
         if (data.theme && ['light', 'dark', 'eye-care'].includes(data.theme)) {
           document.documentElement.setAttribute('data-theme', data.theme);
         }
-
-        // Apply font family
-        if (data.font_family) {
-          applyFontFamily(data.font_family);
-        }
       } catch (e) { /* ignore */ }
     };
     loadTheme();
 
     electronAPI?.onThemeChanged?.((newTheme) => {
       document.documentElement.setAttribute('data-theme', newTheme);
-    });
-
-    // Listen for font family changes from settings
-    electronAPI?.onFontFamilyChanged?.((font) => {
-      applyFontFamily(font);
     });
 
     // Listen for pomodoro state changes

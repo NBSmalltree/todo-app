@@ -51,7 +51,6 @@ export default function Settings() {
     edge_hide_delay: 3000,
     edge_snap_threshold: 20,
   });
-  const [fontFamily, setFontFamily] = useState('system');
   const [remindEnabled, setRemindEnabled] = useState(true);
   const [remindMinutes, setRemindMinutes] = useState(15);
   const [isSaving, setIsSaving] = useState(false);
@@ -121,16 +120,7 @@ export default function Settings() {
     try { electronAPI?.setOpacity(opacity); } catch (e) { /* ignore */ }
   }, [opacity]);
 
-  // Apply font family whenever it changes
-  useEffect(() => {
-    applyFontFamily(fontFamily);
-    try { electronAPI?.applyFontFamily(fontFamily); } catch (e) { /* ignore */ }
-  }, [fontFamily]);
 
-  // Apply font family on mount
-  useEffect(() => {
-    applyFontFamily(fontFamily);
-  }, []);
 
   const loadSettings = async () => {
     try {
@@ -152,9 +142,6 @@ export default function Settings() {
         const edgeData = await electronAPI.getEdgeSettings();
         setEdgeSettings(edgeData);
       } catch (e) { /* ignore */ }
-
-      // Load font family
-      if (data.font_family) setFontFamily(data.font_family);
 
       // Load reminder settings
       if (data.remind_minutes != null) {
@@ -195,9 +182,6 @@ export default function Settings() {
       // Save edge settings
       await electronAPI.saveEdgeSettings(edgeSettings);
 
-      // Apply font family
-      applyFontFamily(fontFamily);
-
       setSaveMessage('设置已保存');
       setTimeout(() => setSaveMessage(''), 2000);
     } catch (error) {
@@ -210,19 +194,6 @@ export default function Settings() {
 
   const handleEdgeSettingChange = (key, value) => {
     setEdgeSettings((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const applyFontFamily = (font) => {
-    const fontMap = {
-      system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif",
-      sans: "'Helvetica Neue', Arial, 'Noto Sans SC', sans-serif",
-      serif: "Georgia, 'Noto Serif SC', serif",
-      mono: "'SF Mono', Monaco, 'Courier New', 'Noto Sans SC', monospace",
-      pingfang: "'PingFang SC', 'Helvetica Neue', Arial, sans-serif",
-      microsoft: "'Microsoft YaHei', 'Segoe UI', Arial, sans-serif",
-    };
-    const fontFamilyValue = fontMap[font] || fontMap.system;
-    document.documentElement.style.setProperty('--app-font-family', fontFamilyValue);
   };
 
   const handleChange = (key, value) => {
@@ -409,37 +380,6 @@ export default function Settings() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-400 mt-1">仅影响待办清单悬浮窗口的透明度</p>
-              </div>
-
-              {/* Font Family Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  字体样式
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { id: 'system', label: '系统默认', desc: '自动适配当前系统字体' },
-                    { id: 'pingfang', label: '苹方', desc: 'macOS 优雅中文字体' },
-                    { id: 'microsoft', label: '微软雅黑', desc: 'Windows 经典中文字体' },
-                    { id: 'sans', label: '无衬线', desc: '简洁现代的字体风格' },
-                    { id: 'serif', label: '衬线', desc: '传统正式的字体风格' },
-                    { id: 'mono', label: '等宽', desc: '适合代码和数据展示' },
-                  ].map((font) => (
-                    <button
-                      key={font.id}
-                      onClick={() => setFontFamily(font.id)}
-                      className={`flex flex-col items-start gap-1 p-3 rounded-lg border-2 transition-all text-left ${
-                        fontFamily === font.id
-                          ? 'border-sky-500 bg-sky-50 text-sky-700'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className="text-sm font-medium">{font.label}</span>
-                      <span className="text-xs opacity-75">{font.desc}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-400 mt-2">选择适合您的字体样式，保存后立即生效</p>
               </div>
             </div>
           </div>
