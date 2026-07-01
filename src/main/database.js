@@ -149,6 +149,19 @@ class TodoDatabase {
           }
         },
       },
+      {
+        version: 7,
+        sql: `
+          CREATE TABLE IF NOT EXISTS subtasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            todo_id INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            completed INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now', 'localtime'))
+          )
+        `,
+      },
     ];
 
     const insertVersion = this.db.prepare('INSERT OR IGNORE INTO schema_version (version) VALUES (?)');
@@ -500,6 +513,62 @@ class TodoDatabase {
     } catch (e) {
       console.error('getPomodoroSessions failed:', e);
       return [];
+    }
+  }
+
+  // === Subtask methods ===
+
+  getSubtasks(todoId) {
+    try {
+      return this.db
+        .prepare('SELECT * FROM subtasks WHERE todo_id = ? ORDER BY sort_order ASC, id ASC')
+        .all(todoId);
+    } catch (e) {
+      console.error('getSubtasks failed:', e);
+      return [];
+    }
+  }
+
+  addSubtask(todoId, text) {
+    try {
+      const maxOrder = this.db.prepare('SELECT COALESCE(MAX(sort_order), -1) as m FROM subtasks WHERE todo_id = ?').get(todoId);
+      const result = this.db.prepare('INSERT INTO subtasks (todo_id, text, sort_order) VALUES (?, ?, ?)').run(todoId, text, maxOrder.m + 1);
+      return this.db.prepare('SELECT * FROM subtasks WHERE id = ?').get(result.lastInsertRowid);
+    } catch (e) {
+      console.error('addSubtask failed:', e);
+      return null;
+    }
+  }
+
+  toggleSubtask(id) {
+    try {
+      const sub = this.db.prepare('SELECT * FROM subtasks WHERE id = ?').get(id);
+      if (!sub) return null;
+      this.db.prepare('UPDATE subtasks SET completed = ? WHERE id = ?').run(sub.completed ? 0 : 1, id);
+      return this.db.prepare('SELECT * FROM subtasks WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('toggleSubtask failed:', e);
+      return null;
+    }
+  }
+
+  deleteSubtask(id) {
+    try {
+      this.db.prepare('DELETE FROM subtasks WHERE id = ?').run(id);
+      return { success: true };
+    } catch (e) {
+      console.error('deleteSubtask failed:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  updateSubtaskText(id, text) {
+    try {
+      this.db.prepare('UPDATE subtasks SET text = ? WHERE id = ?').run(text, id);
+      return this.db.prepare('SELECT * FROM subtasks WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('updateSubtaskText failed:', e);
+      return null;
     }
   }
 

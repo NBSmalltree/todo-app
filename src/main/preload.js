@@ -17,6 +17,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateColor: (id, color) => ipcRenderer.invoke('db:updateColor', id, color),
   updateText: (id, text) => ipcRenderer.invoke('db:updateText', id, text),
   getWorkAnalysis: (period) => ipcRenderer.invoke('db:getWorkAnalysis', period),
+
+  // Subtask operations
+  getSubtasks: (todoId) => ipcRenderer.invoke('db:getSubtasks', todoId),
+  addSubtask: (todoId, text) => ipcRenderer.invoke('db:addSubtask', todoId, text),
+  toggleSubtask: (id) => ipcRenderer.invoke('db:toggleSubtask', id),
+  deleteSubtask: (id) => ipcRenderer.invoke('db:deleteSubtask', id),
+  updateSubtaskText: (id, text) => ipcRenderer.invoke('db:updateSubtaskText', id, text),
   getSettings: () => ipcRenderer.invoke('db:getSettings'),
   saveSettings: (settings) => ipcRenderer.invoke('db:saveSettings', settings),
 

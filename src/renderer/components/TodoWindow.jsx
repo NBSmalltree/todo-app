@@ -25,6 +25,10 @@ export default function TodoWindow() {
     const [edgeState, setEdgeState] = useState({ snapped: false, edge: null, hidden: false });
   const [searchText, setSearchText] = useState('');     // 搜索文本
   const searchInputRef = useRef(null);                  // 搜索输入框 ref
+  // Subtask state
+  const [expandedSubtaskIds, setExpandedSubtaskIds] = useState(new Set());
+  const [subtaskData, setSubtaskData] = useState({});   // todoId → subtask[]
+  const [newSubtaskText, setNewSubtaskText] = useState({}); // todoId → text
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const editInputRef = useRef(null);
@@ -368,6 +372,51 @@ export default function TodoWindow() {
 
   const handleCloseDueDatePicker = () => {
     setDatePickerId(null);
+  };
+
+  // === Subtask handlers ===
+
+  const loadSubtasks = async (todoId) => {
+    try {
+      const subs = await electronAPI.getSubtasks(todoId);
+      setSubtaskData((prev) => ({ ...prev, [todoId]: subs }));
+    } catch { /* ignore */ }
+  };
+
+  const toggleExpandSubtask = async (todoId) => {
+    const next = new Set(expandedSubtaskIds);
+    if (next.has(todoId)) {
+      next.delete(todoId);
+    } else {
+      next.add(todoId);
+      if (!subtaskData[todoId]) await loadSubtasks(todoId);
+    }
+    setExpandedSubtaskIds(next);
+  };
+
+  const handleAddSubtask = async (todoId) => {
+    const text = (newSubtaskText[todoId] || '').trim();
+    if (!text) return;
+    await electronAPI.addSubtask(todoId, text);
+    setNewSubtaskText((prev) => ({ ...prev, [todoId]: '' }));
+    await loadSubtasks(todoId);
+  };
+
+  const handleToggleSubtask = async (id, todoId) => {
+    await electronAPI.toggleSubtask(id);
+    await loadSubtasks(todoId);
+  };
+
+  const handleDeleteSubtask = async (id, todoId) => {
+    await electronAPI.deleteSubtask(id);
+    await loadSubtasks(todoId);
+  };
+
+  const handleSubtaskKeyDown = (e, todoId) => {
+    if (e.key === 'Enter' && !isComposingRef.current) {
+      e.preventDefault();
+      handleAddSubtask(todoId);
+    }
   };
 
   const handleEditKeyDown = (e, id) => {
@@ -739,6 +788,26 @@ export default function TodoWindow() {
                   </svg>
                 </button>
               )}
+              {/* Subtask expand button */}
+              {!editingId && (
+                <button
+                  onClick={() => toggleExpandSubtask(todo.id)}
+                  className={`flex-shrink-0 w-5 h-5 flex items-center justify-center rounded transition-all group-hover:opacity-100 ${
+                    expandedSubtaskIds.has(todo.id)
+                      ? 'opacity-100 text-sky-500 hover:bg-sky-50'
+                      : 'opacity-0 text-gray-300 hover:text-gray-500'
+                  }`}
+                  title="子任务"
+                >
+                  <svg
+                    width="13" height="13" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" strokeWidth="2"
+                    className={`transition-transform ${expandedSubtaskIds.has(todo.id) ? 'rotate-90' : ''}`}
+                  >
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </button>
+              )}
               <button
                 onClick={() => handleDelete(todo.id)}
                 className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
@@ -748,6 +817,71 @@ export default function TodoWindow() {
                 </svg>
               </button>
             </div>
+
+            {/* Subtask progress indicator (after main row, before date picker) */}
+            {!editingId && subtaskData[todo.id] && subtaskData[todo.id].length > 0 && (
+              <div className="flex items-center gap-1 px-9 py-0.5">
+                <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-sky-400 rounded-full transition-all"
+                    style={{ width: `${subtaskData[todo.id].length > 0
+                      ? (subtaskData[todo.id].filter((s) => s.completed).length / subtaskData[todo.id].length) * 100
+                      : 0}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-gray-400 tabular-nums">
+                  {subtaskData[todo.id].filter((s) => s.completed).length}/{subtaskData[todo.id].length}
+                </span>
+              </div>
+            )}
+
+            {/* Expanded subtask list */}
+            {expandedSubtaskIds.has(todo.id) && (
+              <div className="pl-9 pr-2 pb-1 space-y-0.5">
+                {(subtaskData[todo.id] || []).map((sub) => (
+                  <div key={sub.id} className="flex items-center gap-1.5 group/sub">
+                    <button
+                      onClick={() => handleToggleSubtask(sub.id, todo.id)}
+                      className={`flex-shrink-0 w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all ${
+                        sub.completed
+                          ? 'bg-sky-400'
+                          : 'border border-gray-300 hover:border-sky-400'
+                      }`}
+                    >
+                      {sub.completed ? (
+                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4">
+                          <path d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : null}
+                    </button>
+                    <span className={`flex-1 text-[11px] truncate ${sub.completed ? 'text-gray-400 line-through' : 'text-gray-600'}`}>
+                      {sub.text}
+                    </span>
+                    <button
+                      onClick={() => handleDeleteSubtask(sub.id, todo.id)}
+                      className="flex-shrink-0 opacity-0 group-hover/sub:opacity-100 w-4 h-4 flex items-center justify-center rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
+                    >
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+                {/* Add subtask input */}
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  <div className="w-3.5 h-3.5 rounded-full border border-dashed border-gray-300 flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={newSubtaskText[todo.id] || ''}
+                    onChange={(e) => setNewSubtaskText((prev) => ({ ...prev, [todo.id]: e.target.value }))}
+                    onKeyDown={(e) => handleSubtaskKeyDown(e, todo.id)}
+                    placeholder="添加子任务..."
+                    className="flex-1 min-w-0 text-[11px] bg-transparent border-none outline-none placeholder-gray-300 text-gray-600"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Inline date picker */}
             {datePickerId === todo.id && (
               <DueDatePicker

@@ -393,6 +393,29 @@ function setupIPC() {
     if (!isPositiveInt(id) || !isNonEmptyString(text)) return null;
     return db.updateText(id, text.trim());
   });
+
+  // Subtask operations
+  ipcMain.handle('db:getSubtasks', (e, todoId) => {
+    if (!isPositiveInt(todoId)) return [];
+    return db.getSubtasks(todoId);
+  });
+  ipcMain.handle('db:addSubtask', (e, todoId, text) => {
+    if (!isPositiveInt(todoId) || !isNonEmptyString(text)) return null;
+    return db.addSubtask(todoId, text.trim());
+  });
+  ipcMain.handle('db:toggleSubtask', (e, id) => {
+    if (!isPositiveInt(id)) return null;
+    return db.toggleSubtask(id);
+  });
+  ipcMain.handle('db:deleteSubtask', (e, id) => {
+    if (!isPositiveInt(id)) return { success: false };
+    return db.deleteSubtask(id);
+  });
+  ipcMain.handle('db:updateSubtaskText', (e, id, text) => {
+    if (!isPositiveInt(id) || !isNonEmptyString(text)) return null;
+    return db.updateSubtaskText(id, text.trim());
+  });
+
   ipcMain.handle('db:getWorkAnalysis', (e, period) => {
     const validPeriods = ['week', 'month', 'year'];
     return db.getWorkAnalysis(validPeriods.includes(period) ? period : 'week');
