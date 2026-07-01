@@ -520,50 +520,64 @@ export default function Settings() {
             <h2 className="text-lg font-semibold text-gray-800 mb-1">🍅 番茄钟</h2>
             <p className="text-sm text-gray-500 mb-4">配置番茄钟专注时长和休息间隔</p>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">专注时长（分钟）</label>
-                <input
-                  type="number"
-                  value={settings.pomodoro_focus ?? 25}
-                  onChange={(e) => handleChange('pomodoro_focus', Math.max(1, Math.min(120, parseInt(e.target.value) || 25)))}
-                  min="1" max="120"
-                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
-                />
-                <p className="text-xs text-gray-400 mt-1">建议 25 分钟，范围 1-120</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">短休息（分钟）</label>
-                <input
-                  type="number"
-                  value={settings.pomodoro_short_break ?? 5}
-                  onChange={(e) => handleChange('pomodoro_short_break', Math.max(1, Math.min(30, parseInt(e.target.value) || 5)))}
-                  min="1" max="30"
-                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
-                />
-                <p className="text-xs text-gray-400 mt-1">每次专注后的短暂休息，建议 5 分钟</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">长休息（分钟）</label>
-                <input
-                  type="number"
-                  value={settings.pomodoro_long_break ?? 15}
-                  onChange={(e) => handleChange('pomodoro_long_break', Math.max(1, Math.min(60, parseInt(e.target.value) || 15)))}
-                  min="1" max="60"
-                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
-                />
-                <p className="text-xs text-gray-400 mt-1">完成多轮专注后的长时间休息，建议 15 分钟</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">长休息间隔（轮数）</label>
-                <input
-                  type="number"
-                  value={settings.pomodoro_cycles_before_long ?? 4}
-                  onChange={(e) => handleChange('pomodoro_cycles_before_long', Math.max(1, Math.min(10, parseInt(e.target.value) || 4)))}
-                  min="1" max="10"
-                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
-                />
-                <p className="text-xs text-gray-400 mt-1">每 N 轮专注后进行一次长休息，建议 4 轮</p>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">专注时长</label>
+                  <div className="flex items-center gap-0.5">
+                    <input
+                      type="number"
+                      value={settings.pomodoro_focus ?? 25}
+                      onChange={(e) => handleChange('pomodoro_focus', Math.max(1, Math.min(120, parseInt(e.target.value) || 25)))}
+                      min="1" max="120"
+                      className="w-full px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                    />
+                    <span className="text-xs text-gray-400 w-5 shrink-0 text-center">分</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-0.5">建议 25，范围 1-120</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">短休息</label>
+                  <div className="flex items-center gap-0.5">
+                    <input
+                      type="number"
+                      value={settings.pomodoro_short_break ?? 5}
+                      onChange={(e) => handleChange('pomodoro_short_break', Math.max(1, Math.min(30, parseInt(e.target.value) || 5)))}
+                      min="1" max="30"
+                      className="w-full px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                    />
+                    <span className="text-xs text-gray-400 w-5 shrink-0 text-center">分</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-0.5">建议 5</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">长休息</label>
+                  <div className="flex items-center gap-0.5">
+                    <input
+                      type="number"
+                      value={settings.pomodoro_long_break ?? 15}
+                      onChange={(e) => handleChange('pomodoro_long_break', Math.max(1, Math.min(60, parseInt(e.target.value) || 15)))}
+                      min="1" max="60"
+                      className="w-full px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                    />
+                    <span className="text-xs text-gray-400 w-5 shrink-0 text-center">分</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-0.5">建议 15</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">长休息间隔</label>
+                  <div className="flex items-center gap-0.5">
+                    <input
+                      type="number"
+                      value={settings.pomodoro_cycles_before_long ?? 4}
+                      onChange={(e) => handleChange('pomodoro_cycles_before_long', Math.max(1, Math.min(10, parseInt(e.target.value) || 4)))}
+                      min="1" max="10"
+                      className="w-full px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                    />
+                    <span className="text-xs text-gray-400 w-5 shrink-0 text-center">轮</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-0.5">建议 4 轮</p>
+                </div>
               </div>
             </div>
           </div>
