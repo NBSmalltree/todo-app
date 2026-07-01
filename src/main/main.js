@@ -398,6 +398,21 @@ function setupIPC() {
     return db.getWorkAnalysis(validPeriods.includes(period) ? period : 'week');
   });
   ipcMain.handle('db:getSettings', () => db.getSettings());
+  // Handle test notification
+  ipcMain.handle('notification:test', () => {
+    try {
+      const { Notification } = require('electron');
+      const notif = new Notification({
+        title: 'TodoFloat 提醒',
+        body: '这是一条测试通知，如果你看到了说明提醒功能正常 ✔',
+        silent: false,
+      });
+      notif.show();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
   ipcMain.handle('db:saveSettings', (e, settings) => {
     if (!settings || typeof settings !== 'object') {
       return { success: false, error: 'Invalid settings' };
@@ -721,6 +736,35 @@ function setupIPC() {
       }
     });
   });
+
+  // ===== Pomodoro Timer =====
+  ipcMain.handle('pomodoro:getState', () => getPomodoroState());
+  ipcMain.handle('pomodoro:start', async (e, { taskId, taskText }) => {
+    try {
+      return startPomodoro(db, taskId, taskText);
+    } catch (err) {
+      console.error('[Pomodoro] start error:', err.message);
+      return { success: false, error: err.message };
+    }
+  });
+  ipcMain.handle('pomodoro:pause', () => pausePomodoro());
+  ipcMain.handle('pomodoro:resume', () => resumePomodoro());
+  ipcMain.handle('pomodoro:stop', () => {
+    try {
+      return stopPomodoro(db);
+    } catch (err) {
+      console.error('[Pomodoro] stop error:', err.message);
+      return { success: false, error: err.message };
+    }
+  });
+  ipcMain.handle('pomodoro:getSessions', () => {
+    try {
+      return db.getPomodoroSessions();
+    } catch (err) {
+      console.error('[Pomodoro] getSessions error:', err.message);
+      return [];
+    }
+  });
 }
 
 // Single instance lock - prevent multiple instances (especially on Windows)
@@ -774,6 +818,259 @@ if (!gotTheLock) {
     // Start reminder polling (check every 60 seconds)
     startReminderPolling();
   });
+
+// ===== Pomodoro Timer =====
+const POMODORO_DEFAULTS = {
+  focusMinutes: 25,
+  shortBreakMinutes: 5,
+  longBreakMinutes: 15,
+  cyclesBeforeLongBreak: 4,
+};
+
+let pomodoroTimer = null;
+const pomodoroState = {
+  isRunning: false,
+  isPaused: false,
+  timeRemaining: 0,
+  totalDuration: 0,
+  cycleType: 'focus', // 'focus' | 'short_break' | 'long_break'
+  cyclesCompleted: 0,
+  taskId: null,
+  taskText: null,
+  sessionId: null,
+  startTime: null,
+};
+
+function getPomodoroConfig(dbInstance) {
+  const s = dbInstance.getSettings();
+  return {
+    focusMinutes: Number(s.pomodoro_focus) || POMODORO_DEFAULTS.focusMinutes,
+    shortBreakMinutes: Number(s.pomodoro_short_break) || POMODORO_DEFAULTS.shortBreakMinutes,
+    longBreakMinutes: Number(s.pomodoro_long_break) || POMODORO_DEFAULTS.longBreakMinutes,
+    cyclesBeforeLongBreak: Number(s.pomodoro_cycles_before_long) || POMODORO_DEFAULTS.cyclesBeforeLongBreak,
+  };
+}
+
+function broadcastPomodoroState() {
+  const state = {
+    isRunning: pomodoroState.isRunning,
+    isPaused: pomodoroState.isPaused,
+    timeRemaining: pomodoroState.timeRemaining,
+    totalDuration: pomodoroState.totalDuration,
+    cycleType: pomodoroState.cycleType,
+    cyclesCompleted: pomodoroState.cyclesCompleted,
+    taskId: pomodoroState.taskId,
+    taskText: pomodoroState.taskText,
+    sessionId: pomodoroState.sessionId,
+  };
+  [floatWindow, trayWindow, settingsWindow, quickAddWindow].forEach((win) => {
+    try {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('pomodoro:stateChanged', state);
+      }
+    } catch { /* ignore */ }
+  });
+}
+
+function startPomodoro(dbInstance, taskId, taskText) {
+  if (pomodoroState.isRunning) {
+    return { success: false, error: '番茄钟已在运行' };
+  }
+
+  const config = getPomodoroConfig(dbInstance);
+  const duration = config.focusMinutes * 60; // seconds
+
+  // Create session record
+  const session = dbInstance.addPomodoroSession({
+    task_id: taskId,
+    task_text: taskText || null,
+    duration,
+    cycle_type: 'focus',
+  });
+
+  if (!session) {
+    return { success: false, error: '创建会话失败' };
+  }
+
+  pomodoroState.isRunning = true;
+  pomodoroState.isPaused = false;
+  pomodoroState.timeRemaining = duration;
+  pomodoroState.totalDuration = duration;
+  pomodoroState.cycleType = 'focus';
+  pomodoroState.taskId = taskId || null;
+  pomodoroState.taskText = taskText || null;
+  pomodoroState.sessionId = session.id;
+  pomodoroState.startTime = Date.now();
+
+  clearInterval(pomodoroTimer);
+  pomodoroTimer = setInterval(() => {
+    if (pomodoroState.isPaused) return;
+    pomodoroState.timeRemaining--;
+    broadcastPomodoroState();
+
+    // Timer complete
+    if (pomodoroState.timeRemaining <= 0) {
+      clearInterval(pomodoroTimer);
+      pomodoroTimer = null;
+      pomodoroState.isRunning = false;
+
+      // Update session as completed
+      const actualDuration = Math.round((Date.now() - pomodoroState.startTime) / 1000);
+      dbInstance.updatePomodoroSession(pomodoroState.sessionId, {
+        end_time: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        actual_duration: actualDuration,
+        completed: 1,
+      });
+
+      // Show notification
+      try {
+        const { Notification } = require('electron');
+        const notif = new Notification({
+          title: '🍅 番茄时间结束！',
+          body: taskText ? `「${taskText}」的专注时间已到，休息一下吧！` : '专注时间已到，休息一下吧！',
+          silent: false,
+        });
+        notif.show();
+        notif.on('click', () => {
+          try {
+            if (floatWindow && !floatWindow.isDestroyed()) {
+              floatWindow.show();
+              floatWindow.focus();
+            }
+          } catch { /* ignore */ }
+        });
+      } catch { /* ignore */ }
+
+      // Auto-start break
+      const config2 = getPomodoroConfig(dbInstance);
+      pomodoroState.cyclesCompleted++;
+      const isLongBreak = pomodoroState.cyclesCompleted % config2.cyclesBeforeLongBreak === 0;
+      const breakType = isLongBreak ? 'long_break' : 'short_break';
+      const breakDuration = (isLongBreak ? config2.longBreakMinutes : config2.shortBreakMinutes) * 60;
+
+      // Create break session
+      const breakSession = dbInstance.addPomodoroSession({
+        task_id: taskId,
+        task_text: taskText || null,
+        duration: breakDuration,
+        cycle_type: breakType,
+      });
+
+      if (breakSession) {
+        pomodoroState.isRunning = true;
+        pomodoroState.isPaused = false;
+        pomodoroState.timeRemaining = breakDuration;
+        pomodoroState.totalDuration = breakDuration;
+        pomodoroState.cycleType = breakType;
+        pomodoroState.sessionId = breakSession.id;
+        pomodoroState.startTime = Date.now();
+
+        pomodoroTimer = setInterval(() => {
+          if (pomodoroState.isPaused) return;
+          pomodoroState.timeRemaining--;
+          broadcastPomodoroState();
+
+          if (pomodoroState.timeRemaining <= 0) {
+            clearInterval(pomodoroTimer);
+            pomodoroTimer = null;
+            pomodoroState.isRunning = false;
+
+            const actDur = Math.round((Date.now() - pomodoroState.startTime) / 1000);
+            dbInstance.updatePomodoroSession(pomodoroState.sessionId, {
+              end_time: new Date().toISOString().replace('T', ' ').slice(0, 19),
+              actual_duration: actDur,
+              completed: 1,
+            });
+
+            try {
+              const { Notification } = require('electron');
+              const notif = new Notification({
+                title: isLongBreak ? '☕ 长休息结束！' : '☕ 休息结束！',
+                body: '休息时间结束，准备开始新的番茄吧！',
+                silent: false,
+              });
+              notif.show();
+            } catch { /* ignore */ }
+
+            broadcastPomodoroState();
+          }
+        }, 1000);
+      }
+
+      broadcastPomodoroState();
+    }
+  }, 1000);
+
+  broadcastPomodoroState();
+  return { success: true };
+}
+
+function pausePomodoro() {
+  if (!pomodoroState.isRunning || pomodoroState.isPaused) {
+    return { success: false };
+  }
+  pomodoroState.isPaused = true;
+  broadcastPomodoroState();
+  return { success: true };
+}
+
+function resumePomodoro() {
+  if (!pomodoroState.isRunning || !pomodoroState.isPaused) {
+    return { success: false };
+  }
+  pomodoroState.isPaused = false;
+  broadcastPomodoroState();
+  return { success: true };
+}
+
+function stopPomodoro(dbInstance) {
+  if (!pomodoroState.isRunning && !pomodoroState.isPaused) {
+    return { success: false, error: '没有正在运行的番茄钟' };
+  }
+
+  clearInterval(pomodoroTimer);
+  pomodoroTimer = null;
+
+  // Record incompleted session
+  if (pomodoroState.sessionId) {
+    const actualDuration = pomodoroState.startTime
+      ? Math.round((Date.now() - pomodoroState.startTime) / 1000)
+      : 0;
+    dbInstance.updatePomodoroSession(pomodoroState.sessionId, {
+      end_time: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      actual_duration: actualDuration,
+      completed: 0,
+    });
+  }
+
+  // Reset state
+  pomodoroState.isRunning = false;
+  pomodoroState.isPaused = false;
+  pomodoroState.timeRemaining = 0;
+  pomodoroState.totalDuration = 0;
+  pomodoroState.cycleType = 'focus';
+  pomodoroState.taskId = null;
+  pomodoroState.taskText = null;
+  pomodoroState.sessionId = null;
+  pomodoroState.startTime = null;
+
+  broadcastPomodoroState();
+  return { success: true };
+}
+
+function getPomodoroState() {
+  return {
+    isRunning: pomodoroState.isRunning,
+    isPaused: pomodoroState.isPaused,
+    timeRemaining: pomodoroState.timeRemaining,
+    totalDuration: pomodoroState.totalDuration,
+    cycleType: pomodoroState.cycleType,
+    cyclesCompleted: pomodoroState.cyclesCompleted,
+    taskId: pomodoroState.taskId,
+    taskText: pomodoroState.taskText,
+    sessionId: pomodoroState.sessionId,
+  };
+}
 
 // Reminder polling: check due tasks every 60 seconds
 let reminderTimer = null;

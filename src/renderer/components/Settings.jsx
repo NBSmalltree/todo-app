@@ -59,6 +59,8 @@ export default function Settings() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [notifTesting, setNotifTesting] = useState(false);
+  const [notifResult, setNotifResult] = useState(null);
   const [scale, setScale] = useState(1);
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
@@ -222,6 +224,64 @@ export default function Settings() {
       ? { api_format: format, base_url: 'https://api.anthropic.com', model: 'claude-sonnet-4-20250514' }
       : { api_format: format, base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini' };
     setSettings((prev) => ({ ...prev, ...defaults }));
+  };
+
+  // 预设 AI 服务商
+  const PROVIDERS = [
+    {
+      id: 'openai',
+      name: 'OpenAI',
+      desc: 'GPT-4o / GPT-4o-mini',
+      icon: '🤖',
+      config: { api_format: 'openai', base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+    },
+    {
+      id: 'deepseek',
+      name: 'DeepSeek',
+      desc: 'DeepSeek-V3 / DeepSeek-R1',
+      icon: '🧊',
+      config: { api_format: 'openai', base_url: 'https://api.deepseek.com', model: 'deepseek-chat' },
+    },
+    {
+      id: 'zhipu',
+      name: '智谱 GLM',
+      desc: 'GLM-4-Plus / GLM-4-Flash',
+      icon: '🔮',
+      config: { api_format: 'openai', base_url: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-plus' },
+    },
+    {
+      id: 'anthropic',
+      name: 'Anthropic',
+      desc: 'Claude Sonnet / Claude Haiku',
+      icon: '🧠',
+      config: { api_format: 'anthropic', base_url: 'https://api.anthropic.com', model: 'claude-sonnet-4-20250514' },
+    },
+  ];
+
+  const handleApplyPreset = (providerId) => {
+    const provider = PROVIDERS.find((p) => p.id === providerId);
+    if (!provider) return;
+    setSettings((prev) => ({ ...prev, ...provider.config }));
+  };
+
+  // 判断当前设置是否匹配某个预设（用于高亮显示）
+  const isActivePreset = (config) => {
+    return settings.api_format === config.api_format
+      && settings.base_url === config.base_url
+      && settings.model === config.model;
+  };
+
+  const handleTestNotification = async () => {
+    setNotifTesting(true);
+    setNotifResult(null);
+    try {
+      const result = await electronAPI.testNotification();
+      setNotifResult(result);
+    } catch (error) {
+      setNotifResult({ success: false, error: error.message });
+    } finally {
+      setNotifTesting(false);
+    }
   };
 
   const handleTest = async () => {
@@ -460,6 +520,76 @@ export default function Settings() {
                 </div>
               )}
             </div>
+
+            {/* Test notification button */}
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={handleTestNotification}
+                disabled={notifTesting}
+                className="px-4 py-1.5 text-xs font-medium text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {notifTesting ? '发送中...' : '发送测试通知'}
+              </button>
+              {notifResult && (
+                <span className={`ml-2 text-xs ${notifResult.success ? 'text-green-600' : 'text-red-500'}`}>
+                  {notifResult.success ? '已发送，请查看系统通知' : `失败：${notifResult.error}`}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Pomodoro Settings */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">🍅 番茄钟</h2>
+            <p className="text-sm text-gray-500 mb-4">配置番茄钟专注时长和休息间隔</p>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">专注时长（分钟）</label>
+                <input
+                  type="number"
+                  value={settings.pomodoro_focus ?? 25}
+                  onChange={(e) => handleChange('pomodoro_focus', Math.max(1, Math.min(120, parseInt(e.target.value) || 25)))}
+                  min="1" max="120"
+                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                />
+                <p className="text-xs text-gray-400 mt-1">建议 25 分钟，范围 1-120</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">短休息（分钟）</label>
+                <input
+                  type="number"
+                  value={settings.pomodoro_short_break ?? 5}
+                  onChange={(e) => handleChange('pomodoro_short_break', Math.max(1, Math.min(30, parseInt(e.target.value) || 5)))}
+                  min="1" max="30"
+                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                />
+                <p className="text-xs text-gray-400 mt-1">每次专注后的短暂休息，建议 5 分钟</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">长休息（分钟）</label>
+                <input
+                  type="number"
+                  value={settings.pomodoro_long_break ?? 15}
+                  onChange={(e) => handleChange('pomodoro_long_break', Math.max(1, Math.min(60, parseInt(e.target.value) || 15)))}
+                  min="1" max="60"
+                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                />
+                <p className="text-xs text-gray-400 mt-1">完成多轮专注后的长时间休息，建议 15 分钟</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">长休息间隔（轮数）</label>
+                <input
+                  type="number"
+                  value={settings.pomodoro_cycles_before_long ?? 4}
+                  onChange={(e) => handleChange('pomodoro_cycles_before_long', Math.max(1, Math.min(10, parseInt(e.target.value) || 4)))}
+                  min="1" max="10"
+                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                />
+                <p className="text-xs text-gray-400 mt-1">每 N 轮专注后进行一次长休息，建议 4 轮</p>
+              </div>
+            </div>
           </div>
 
           {/* AI Settings */}
@@ -468,6 +598,42 @@ export default function Settings() {
             <p className="text-sm text-gray-500 mb-4">
               配置大模型 API，用于归档任务时自动判断工作类别
             </p>
+
+            {/* 快速选择服务商 */}
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                快速选择服务商
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {PROVIDERS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleApplyPreset(p.id)}
+                    className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-all ${
+                      isActivePreset(p.config)
+                        ? 'border-sky-400 bg-sky-50 ring-1 ring-sky-200'
+                        : 'border-gray-200 bg-white hover:border-sky-200 hover:bg-sky-50/50'
+                    }`}
+                  >
+                    <span className="text-lg shrink-0 mt-0.5">{p.icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-gray-800">{p.name}</div>
+                      <div className="text-[11px] text-gray-400 mt-0.5 truncate">{p.desc}</div>
+                      <div className="text-[10px] text-gray-300 mt-0.5 truncate font-mono">
+                        {p.config.base_url.replace(/^https?:\/\//, '')}
+                      </div>
+                    </div>
+                    {isActivePreset(p.config) && (
+                      <svg className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-2">点击选择服务商，自动填充 Base URL 和模型名称</p>
+            </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
               {/* API Format */}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import DueDatePicker from './DueDatePicker';
+import PomodoroPanel from './PomodoroPanel';
 
 const { electronAPI } = window;
 
@@ -590,6 +591,11 @@ export default function TodoWindow() {
           </div>
         </div>
       )}
+
+      {/* Pomodoro Timer */}
+      <div className="px-3 pt-2">
+        <PomodoroPanel todos={todos} />
+      </div>
 
       {/* Input Area */}
       <div className="px-3 py-2 border-b border-gray-50">

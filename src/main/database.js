@@ -116,6 +116,39 @@ class TodoDatabase {
           `);
         },
       },
+      {
+        version: 6,
+        sql: `
+          CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER,
+            task_text TEXT,
+            start_time TEXT,
+            end_time TEXT,
+            duration INTEGER,
+            actual_duration INTEGER,
+            cycle_type TEXT,
+            completed INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now', 'localtime'))
+          )
+        `,
+        after: () => {
+          // Seed default pomodoro settings if not present
+          const defaults = {
+            pomodoro_focus: 25,
+            pomodoro_short_break: 5,
+            pomodoro_long_break: 15,
+            pomodoro_cycles_before_long: 4,
+          };
+          const stmt = this.db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)");
+          for (const [key, value] of Object.entries(defaults)) {
+            const existing = this.db.prepare("SELECT COUNT(*) as c FROM settings WHERE key = ?").get(key);
+            if (existing.c === 0) {
+              stmt.run(key, JSON.stringify(value));
+            }
+          }
+        },
+      },
     ];
 
     const insertVersion = this.db.prepare('INSERT OR IGNORE INTO schema_version (version) VALUES (?)');
@@ -421,6 +454,51 @@ class TodoDatabase {
       return rows;
     } catch (e) {
       try { console.error('getDueSoon failed:', e); } catch {}
+      return [];
+    }
+  }
+
+  // === Pomodoro methods ===
+
+  addPomodoroSession({ task_id, task_text, duration, cycle_type }) {
+    try {
+      const now = nowBeijing();
+      const stmt = this.db.prepare(`
+        INSERT INTO pomodoro_sessions (task_id, task_text, start_time, duration, cycle_type, completed)
+        VALUES (?, ?, ?, ?, ?, 0)
+      `);
+      const result = stmt.run(task_id || null, task_text || null, now, duration, cycle_type);
+      return { id: result.lastInsertRowid, ...this.db.prepare('SELECT * FROM pomodoro_sessions WHERE id = ?').get(result.lastInsertRowid) };
+    } catch (e) {
+      console.error('addPomodoroSession failed:', e);
+      return null;
+    }
+  }
+
+  updatePomodoroSession(id, data) {
+    try {
+      const fields = [];
+      const values = [];
+      if (data.end_time !== undefined) { fields.push('end_time = ?'); values.push(data.end_time); }
+      if (data.actual_duration !== undefined) { fields.push('actual_duration = ?'); values.push(data.actual_duration); }
+      if (data.completed !== undefined) { fields.push('completed = ?'); values.push(data.completed ? 1 : 0); }
+      if (fields.length === 0) return null;
+      values.push(id);
+      this.db.prepare(`UPDATE pomodoro_sessions SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+      return this.db.prepare('SELECT * FROM pomodoro_sessions WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('updatePomodoroSession failed:', e);
+      return null;
+    }
+  }
+
+  getPomodoroSessions(limit = 50) {
+    try {
+      return this.db
+        .prepare('SELECT * FROM pomodoro_sessions ORDER BY start_time DESC LIMIT ?')
+        .all(limit);
+    } catch (e) {
+      console.error('getPomodoroSessions failed:', e);
       return [];
     }
   }

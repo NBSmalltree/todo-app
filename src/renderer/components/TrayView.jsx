@@ -32,6 +32,7 @@ function TabIcon({ type }) {
 export default function TrayView() {
   const [activeTab, setActiveTab] = useState('archive');
   const [isMaximized, setIsMaximized] = useState(false);
+  const [pomodoroState, setPomodoroState] = useState(null);
 
   // Apply font family
   const applyFontFamily = (font) => {
@@ -71,6 +72,11 @@ export default function TrayView() {
     // Listen for font family changes from settings
     electronAPI?.onFontFamilyChanged?.((font) => {
       applyFontFamily(font);
+    });
+
+    // Listen for pomodoro state changes
+    electronAPI?.onPomodoroStateChanged?.((state) => {
+      setPomodoroState(state);
     });
 
     // Check initial maximized state
@@ -144,6 +150,23 @@ export default function TrayView() {
           </button>
         </div>
       </div>
+
+      {/* Pomodoro banner (when running) */}
+      {pomodoroState?.isRunning && (
+        <div className={`flex items-center gap-2 px-4 py-2 border-b ${pomodoroState.cycleType === 'focus' ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
+          <span className="text-sm">{pomodoroState.cycleType === 'focus' ? '🍅' : '☕'}</span>
+          <span className={`text-xs font-semibold ${pomodoroState.cycleType === 'focus' ? 'text-rose-600' : 'text-emerald-600'}`}>
+            {pomodoroState.cycleType === 'focus' ? '专注中' : '休息中'}
+            {pomodoroState.isPaused && ' (暂停)'}
+          </span>
+          <span className={`text-sm font-bold tabular-nums ${pomodoroState.cycleType === 'focus' ? 'text-rose-500' : 'text-emerald-500'}`}>
+            {String(Math.floor(pomodoroState.timeRemaining / 60)).padStart(2, '0')}:{String(pomodoroState.timeRemaining % 60).padStart(2, '0')}
+          </span>
+          {pomodoroState.taskText && (
+            <span className="text-xs text-gray-400 truncate flex-1 text-right">{pomodoroState.taskText}</span>
+          )}
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="bg-white border-b border-gray-200 px-6">

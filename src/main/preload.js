@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   categorize: (text) => ipcRenderer.invoke('llm:categorize', text),
   analyzeWork: (data) => ipcRenderer.invoke('llm:analyzeWork', data),
   testLLM: (settings) => ipcRenderer.invoke('llm:test', settings),
+  testNotification: () => ipcRenderer.invoke('notification:test'),
 
   // Quick add
   quickAdd: (text) => ipcRenderer.invoke('db:quickAdd', text),
@@ -47,6 +48,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Theme
   applyTheme: (theme) => ipcRenderer.invoke('window:applyTheme', theme),
+
+  // Pomodoro
+  pomodoroGetState: () => ipcRenderer.invoke('pomodoro:getState'),
+  pomodoroStart: (data) => ipcRenderer.invoke('pomodoro:start', data),
+  pomodoroPause: () => ipcRenderer.invoke('pomodoro:pause'),
+  pomodoroResume: () => ipcRenderer.invoke('pomodoro:resume'),
+  pomodoroStop: () => ipcRenderer.invoke('pomodoro:stop'),
+  pomodoroGetSessions: () => ipcRenderer.invoke('pomodoro:getSessions'),
+  onPomodoroStateChanged: (callback) => {
+    const handler = (e, state) => callback(state);
+    ipcRenderer.on('pomodoro:stateChanged', handler);
+    return () => ipcRenderer.removeListener('pomodoro:stateChanged', handler);
+  },
 
   // Font family
   applyFontFamily: (font) => ipcRenderer.invoke('window:applyFontFamily', font),
