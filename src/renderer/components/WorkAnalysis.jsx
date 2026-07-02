@@ -284,18 +284,21 @@ export default function WorkAnalysis() {
           ) : (
             <>
               {/* Summary cards */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="bg-white rounded-lg border border-rose-100 p-3">
-                  <div className="text-xl font-bold text-rose-500">{pomodoroStats.todaySessions}</div>
-                  <div className="text-[11px] text-rose-400 mt-0.5">今日完成</div>
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="bg-white rounded-lg border border-rose-100 p-2.5 text-center">
+                  <div className="text-2xl font-bold text-rose-500 leading-none">{pomodoroStats.todaySessions}</div>
+                  <div className="text-[10px] text-rose-400 mt-1.5">今日完成</div>
                 </div>
-                <div className="bg-white rounded-lg border border-rose-100 p-3">
-                  <div className="text-xl font-bold text-rose-500">{pomodoroStats.totalSessions}</div>
-                  <div className="text-[11px] text-rose-400 mt-0.5">{getPeriodLabel()}专注</div>
+                <div className="bg-white rounded-lg border border-rose-100 p-2.5 text-center">
+                  <div className="text-2xl font-bold text-rose-500 leading-none">{pomodoroStats.totalSessions}</div>
+                  <div className="text-[10px] text-rose-400 mt-1.5">{getPeriodLabel()}完成</div>
                 </div>
-                <div className="bg-white rounded-lg border border-rose-100 p-3">
-                  <div className="text-xl font-bold text-rose-500">{pomodoroStats.totalFocusMinutes}</div>
-                  <div className="text-[11px] text-rose-400 mt-0.5">总专注（分）</div>
+                <div className="bg-white rounded-lg border border-rose-100 p-2.5 text-center">
+                  <div className="text-2xl font-bold text-rose-500 leading-none">
+                    {pomodoroStats.totalFocusMinutes}
+                    <span className="text-xs font-normal text-rose-400 ml-0.5">分</span>
+                  </div>
+                  <div className="text-[10px] text-rose-400 mt-1.5">总专注</div>
                 </div>
               </div>
 
@@ -322,11 +325,11 @@ export default function WorkAnalysis() {
                     {pomodoroStats.recentSessions.map((s) => (
                       <div key={s.id} className="flex items-center gap-2 text-[11px]">
                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.completed ? 'bg-rose-400' : 'bg-gray-300'}`} />
-                        <span className="text-rose-500 w-16 flex-shrink-0">{s.dateLabel}</span>
+                        <span className="text-rose-500 w-20 flex-shrink-0 whitespace-nowrap">{s.dateLabel}</span>
                         <span className={`flex-1 truncate ${s.completed ? 'text-rose-700' : 'text-gray-400'}`}>
                           {s.task_text || (s.cycle_type === 'focus' ? '专注' : s.cycle_type)}
                         </span>
-                        <span className="text-gray-400 w-10 text-right">{Math.round((s.actual_duration || 0) / 60)}分</span>
+                        <span className="text-gray-400 w-8 text-right flex-shrink-0">{Math.round((s.actual_duration || 0) / 60)}分</span>
                       </div>
                     ))}
                   </div>
