@@ -799,6 +799,14 @@ function setupIPC() {
       return [];
     }
   });
+  ipcMain.handle('pomodoro:getStats', (e, period) => {
+    try {
+      return db.getPomodoroStats(period);
+    } catch (err) {
+      console.error('[Pomodoro] getStats error:', err.message);
+      return { totalSessions: 0, totalFocusMinutes: 0, todaySessions: 0, dailyBreakdown: [], recentSessions: [] };
+    }
+  });
 }
 
 // Single instance lock - prevent multiple instances (especially on Windows)

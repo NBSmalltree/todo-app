@@ -442,8 +442,8 @@ class TodoDatabase {
       let dateSql;
       switch (period) {
         case 'week':
-          // 本周周一 00:00:00（SQLite 的 'weekday 1' = 周一）
-          dateSql = `date('now', 'localtime', 'weekday 1')`;
+          // 本周周一 00:00:00（'weekday 1' 推进到下周一，再减 7 天回到本周周一）
+          dateSql = `date('now', 'localtime', 'weekday 1', '-7 days')`;
           break;
         case 'month':
           dateSql = `date('now', 'localtime', 'start of month')`;
@@ -571,6 +571,53 @@ class TodoDatabase {
     } catch (e) {
       console.error('getPomodoroSessions failed:', e);
       return [];
+    }
+  }
+
+  getPomodoroStats(period = 'week') {
+    try {
+      const days = period === 'week' ? 7 : period === 'month' ? 30 : 365;
+      const today = nowBeijing().slice(0, 10);
+
+      const totalSessions = this.db
+        .prepare(`SELECT COUNT(*) as c FROM pomodoro_sessions
+                   WHERE completed = 1 AND cycle_type = 'focus'
+                     AND start_time >= datetime('now', 'localtime', '-${days} days')`)
+        .get().c;
+
+      const focusRow = this.db
+        .prepare(`SELECT COALESCE(SUM(actual_duration), 0) as total FROM pomodoro_sessions
+                   WHERE completed = 1 AND cycle_type = 'focus'
+                     AND start_time >= datetime('now', 'localtime', '-${days} days')`)
+        .get();
+      const totalFocusMinutes = Math.round(focusRow.total / 60);
+
+      const todaySessions = this.db
+        .prepare(`SELECT COUNT(*) as c FROM pomodoro_sessions
+                   WHERE completed = 1 AND cycle_type = 'focus'
+                     AND start_time >= ? AND start_time < datetime(?, '+1 day')`)
+        .get(today + ' 00:00:00', today).c;
+
+      const dailyRows = this.db
+        .prepare(`SELECT SUBSTR(start_time, 1, 10) as day, COUNT(*) as count
+                   FROM pomodoro_sessions
+                   WHERE completed = 1 AND cycle_type = 'focus'
+                     AND start_time >= datetime('now', 'localtime', '-${days} days')
+                   GROUP BY day ORDER BY day ASC`)
+        .all();
+
+      const dailyBreakdown = dailyRows.map((r) => ({ date: r.day.slice(5), count: r.count }));
+
+      const recentSessions = this.db
+        .prepare(`SELECT id, task_text, start_time, actual_duration, cycle_type, completed
+                   FROM pomodoro_sessions ORDER BY start_time DESC LIMIT 10`)
+        .all()
+        .map((s) => ({ ...s, dateLabel: (s.start_time || '').slice(5, 16) }));
+
+      return { totalSessions, totalFocusMinutes, todaySessions, dailyBreakdown, recentSessions };
+    } catch (e) {
+      console.error('getPomodoroStats failed:', e);
+      return { totalSessions: 0, totalFocusMinutes: 0, todaySessions: 0, dailyBreakdown: [], recentSessions: [] };
     }
   }
 

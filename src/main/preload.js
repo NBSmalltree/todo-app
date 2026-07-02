@@ -70,6 +70,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pomodoroResume: () => ipcRenderer.invoke('pomodoro:resume'),
   pomodoroStop: () => ipcRenderer.invoke('pomodoro:stop'),
   pomodoroGetSessions: () => ipcRenderer.invoke('pomodoro:getSessions'),
+  pomodoroGetStats: (period) => ipcRenderer.invoke('pomodoro:getStats', period),
   onPomodoroStateChanged: (callback) => {
     const handler = (e, state) => callback(state);
     ipcRenderer.on('pomodoro:stateChanged', handler);

@@ -15,9 +15,12 @@ export default function WorkAnalysis() {
   const [isLoading, setIsLoading] = useState(false);
   const [llmTip, setLlmTip] = useState('');
   const [llmLoading, setLlmLoading] = useState(false);
+  const [pomodoroStats, setPomodoroStats] = useState(null);
+  const [pomodoroLoading, setPomodoroLoading] = useState(false);
 
   useEffect(() => {
     loadAnalysis();
+    loadPomodoroStats();
   }, [period]);
 
   const loadAnalysis = async () => {
@@ -28,7 +31,6 @@ export default function WorkAnalysis() {
       const data = await electronAPI.getWorkAnalysis(period);
       setAnalysis(data);
       setIsLoading(false);
-      // Trigger LLM analysis independently
       if (data && data.totalItems > 0) {
         await generateAnalysis(data);
       }
@@ -36,6 +38,15 @@ export default function WorkAnalysis() {
       console.error('Failed to load analysis:', error);
       setIsLoading(false);
     }
+  };
+
+  const loadPomodoroStats = async () => {
+    setPomodoroLoading(true);
+    try {
+      const stats = await electronAPI.pomodoroGetStats(period);
+      setPomodoroStats(stats);
+    } catch (e) { /* ignore */ }
+    setPomodoroLoading(false);
   };
 
   const generateAnalysis = async (data) => {
@@ -84,7 +95,12 @@ export default function WorkAnalysis() {
     return Math.round((archived / total) * 100);
   };
 
-  if (isLoading) {
+  // Wait for both loads to finish before deciding empty state
+  const bothLoaded = analysis !== null && pomodoroStats !== null;
+  const hasAnyData = (analysis && analysis.totalItems > 0) ||
+    (pomodoroStats && (pomodoroStats.totalSessions > 0 || pomodoroStats.todaySessions > 0));
+
+  if (isLoading || !bothLoaded) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500" />
@@ -92,14 +108,14 @@ export default function WorkAnalysis() {
     );
   }
 
-  if (!analysis || analysis.totalItems === 0) {
+  if (!hasAnyData) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-400 p-6">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <path d="M18 20V10M12 20V4M6 20v-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <span className="text-sm mt-4">暂无{getPeriodLabel()}的工作数据</span>
-        <span className="text-xs mt-1 text-gray-300">归档任务后即可查看工作分析</span>
+        <span className="text-xs mt-1 text-gray-300">归档任务或使用番茄钟后即可查看分析</span>
       </div>
     );
   }
@@ -223,6 +239,74 @@ export default function WorkAnalysis() {
             ))}
         </div>
       </div>
+
+      {/* Pomodoro Stats */}
+      {pomodoroStats && (
+        <div className="mt-6 bg-rose-50 rounded-xl border border-rose-100 p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-lg">🍅</span>
+            <h3 className="text-sm font-medium text-rose-700">番茄统计</h3>
+          </div>
+          {pomodoroLoading ? (
+            <div className="flex items-center gap-2 text-rose-400">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-rose-400" />
+              <span className="text-xs">加载中...</span>
+            </div>
+          ) : (
+            <>
+              {/* Summary cards */}
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="bg-white rounded-lg border border-rose-100 p-3">
+                  <div className="text-xl font-bold text-rose-500">{pomodoroStats.todaySessions}</div>
+                  <div className="text-[11px] text-rose-400 mt-0.5">今日完成</div>
+                </div>
+                <div className="bg-white rounded-lg border border-rose-100 p-3">
+                  <div className="text-xl font-bold text-rose-500">{pomodoroStats.totalSessions}</div>
+                  <div className="text-[11px] text-rose-400 mt-0.5">{getPeriodLabel()}专注</div>
+                </div>
+                <div className="bg-white rounded-lg border border-rose-100 p-3">
+                  <div className="text-xl font-bold text-rose-500">{pomodoroStats.totalFocusMinutes}</div>
+                  <div className="text-[11px] text-rose-400 mt-0.5">总专注（分）</div>
+                </div>
+              </div>
+
+              {/* Daily breakdown bar chart */}
+              {pomodoroStats.dailyBreakdown && pomodoroStats.dailyBreakdown.length > 0 && (
+                <div className="h-[120px] mb-4">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={pomodoroStats.dailyBreakdown}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#fce7f3" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#f43f5e" />
+                      <YAxis tick={{ fontSize: 10 }} stroke="#f43f5e" />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#f43f5e" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Recent sessions */}
+              {pomodoroStats.recentSessions && pomodoroStats.recentSessions.length > 0 && (
+                <div>
+                  <h4 className="text-[11px] font-medium text-rose-600 mb-2">最近记录</h4>
+                  <div className="space-y-1 max-h-[150px] overflow-y-auto">
+                    {pomodoroStats.recentSessions.map((s) => (
+                      <div key={s.id} className="flex items-center gap-2 text-[11px]">
+                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.completed ? 'bg-rose-400' : 'bg-gray-300'}`} />
+                        <span className="text-rose-500 w-16 flex-shrink-0">{s.dateLabel}</span>
+                        <span className={`flex-1 truncate ${s.completed ? 'text-rose-700' : 'text-gray-400'}`}>
+                          {s.task_text || (s.cycle_type === 'focus' ? '专注' : s.cycle_type)}
+                        </span>
+                        <span className="text-gray-400 w-10 text-right">{Math.round((s.actual_duration || 0) / 60)}分</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* AI Work Analysis */}
       <div className="mt-6 bg-sky-50 rounded-xl border border-sky-100 p-4">
