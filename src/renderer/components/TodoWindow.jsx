@@ -151,6 +151,7 @@ export default function TodoWindow() {
   }, []);
 
   // Global shortcut: Ctrl/Cmd+F to toggle search
+  // Global shortcut: Ctrl/Cmd+Shift+A to open archive page
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
@@ -159,6 +160,10 @@ export default function TodoWindow() {
           if (!prev) setTimeout(() => searchInputRef.current?.focus(), 50);
           return !prev;
         });
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        handleOpenTray();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
