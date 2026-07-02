@@ -9,6 +9,10 @@ const { electronAPI } = window;
 
 const COLORS = ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd', '#e0f2fe', '#0284c7', '#0369a1', '#075985'];
 
+// Module-level cache survives component mount/unmount (e.g. tab switches)
+const _cache = {};
+let _version = 0;
+
 export default function WorkAnalysis() {
   const [period, setPeriod] = useState('week');
   const [analysis, setAnalysis] = useState(null);
@@ -17,6 +21,16 @@ export default function WorkAnalysis() {
   const [llmLoading, setLlmLoading] = useState(false);
   const [pomodoroStats, setPomodoroStats] = useState(null);
   const [pomodoroLoading, setPomodoroLoading] = useState(false);
+  const [dataVersion, setDataVersion] = useState(0);
+
+  useEffect(() => {
+    // Listen for data changes (archive/toggle) → mark cache stale
+    const cleanup = electronAPI?.onDataChanged?.(() => {
+      _version += 1;
+      setDataVersion(_version);
+    });
+    return cleanup;
+  }, []);
 
   useEffect(() => {
     loadAnalysis();
@@ -25,14 +39,20 @@ export default function WorkAnalysis() {
 
   const loadAnalysis = async () => {
     setIsLoading(true);
-    setLlmTip('');
-    setLlmLoading(false);
     try {
       const data = await electronAPI.getWorkAnalysis(period);
       setAnalysis(data);
       setIsLoading(false);
-      if (data && data.totalItems > 0) {
-        await generateAnalysis(data);
+
+      // Handle LLM analysis — non-blocking, runs after UI is ready
+      const cached = _cache[period];
+      const isStale = !cached || cached.version !== _version;
+      const hasTaskData = data && data.totalItems > 0;
+
+      if (!isStale && cached) {
+        setLlmTip(cached.tip);
+      } else if (hasTaskData) {
+        generateAnalysis(data); // fire-and-forget, don't block page render
       }
     } catch (error) {
       console.error('Failed to load analysis:', error);
@@ -53,11 +73,20 @@ export default function WorkAnalysis() {
     setLlmLoading(true);
     try {
       const tip = await electronAPI.analyzeWork(data);
-      setLlmTip(tip || '暂无分析');
+      const displayTip = tip || '暂无分析';
+      setLlmTip(displayTip);
+      // Save to module-level cache (survives tab switches)
+      _cache[period] = { tip: displayTip, version: _version };
     } catch (e) {
       setLlmTip('分析生成失败');
     } finally {
       setLlmLoading(false);
+    }
+  };
+
+  const handleRegenerate = () => {
+    if (analysis && analysis.totalItems > 0) {
+      generateAnalysis(analysis);
     }
   };
 
@@ -310,36 +339,51 @@ export default function WorkAnalysis() {
 
       {/* AI Work Analysis */}
       <div className="mt-6 bg-sky-50 rounded-xl border border-sky-100 p-4">
-        <div className="flex items-start gap-3">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-sky-500 flex-shrink-0 mt-0.5">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-            <path d="M12 16v-4M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          <div className="text-sm text-sky-700 flex-1">
-            <p className="font-medium mb-1">AI 工作分析</p>
-            {llmLoading ? (
-              <div className="flex items-center gap-2 text-sky-500">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500" />
-                <span>正在分析中...</span>
-              </div>
-            ) : (
-              <div className="text-sky-600 leading-relaxed prose prose-sm prose-sky max-w-none">
-                {llmTip === '分析生成失败' ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="text-sky-600">分析生成失败</span>
-                    <button
-                      onClick={() => generateAnalysis(analysis)}
-                      className="px-3 py-1 text-xs text-sky-600 bg-sky-50 rounded hover:bg-sky-100 transition-colors"
-                    >
-                      重新生成
-                    </button>
-                  </div>
-                ) : (
-                  <ReactMarkdown>{llmTip}</ReactMarkdown>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-sky-500 flex-shrink-0 mt-0.5">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+              <path d="M12 16v-4M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            <div className="text-sm text-sky-700 flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="font-medium">AI 工作分析</p>
+                {!llmLoading && llmTip && llmTip !== '分析生成失败' && (
+                  <span className="text-[10px] text-sky-400 bg-white/60 px-1.5 py-0.5 rounded">已缓存</span>
                 )}
               </div>
-            )}
+              {llmLoading ? (
+                <div className="flex items-center gap-2 text-sky-500">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500" />
+                  <span>正在分析中...</span>
+                </div>
+              ) : llmTip === '分析生成失败' ? (
+                <div className="flex flex-col items-start gap-2">
+                  <span className="text-sky-600">分析生成失败</span>
+                  <button
+                    onClick={handleRegenerate}
+                    className="px-3 py-1 text-xs text-sky-600 bg-sky-50 rounded hover:bg-sky-100 transition-colors"
+                  >
+                    重新生成
+                  </button>
+                </div>
+              ) : llmTip ? (
+                <ReactMarkdown>{llmTip}</ReactMarkdown>
+              ) : !analysis || analysis.totalItems === 0 ? (
+                <span className="text-sky-400 text-xs">暂无数据，归档任务后可生成分析</span>
+              ) : null}
+            </div>
           </div>
+          {/* Regenerate button always visible when content exists */}
+          {!llmLoading && llmTip && llmTip !== '分析生成失败' && (
+            <button
+              onClick={handleRegenerate}
+              className="flex-shrink-0 px-2.5 py-1 text-[11px] text-sky-500 bg-white/70 rounded-lg hover:bg-white hover:text-sky-600 transition-colors border border-sky-200/50"
+              title="重新生成分析"
+            >
+              重新生成
+            </button>
+          )}
         </div>
       </div>
     </div>
