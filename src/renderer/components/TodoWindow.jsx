@@ -25,6 +25,8 @@ export default function TodoWindow() {
     const [edgeState, setEdgeState] = useState({ snapped: false, edge: null, hidden: false });
   const [searchText, setSearchText] = useState('');     // 搜索文本
   const searchInputRef = useRef(null);                  // 搜索输入框 ref
+  const [filterCategory, setFilterCategory] = useState('');  // 分类筛选
+  const [filterDate, setFilterDate] = useState('');          // 日期筛选: ''|'due_today'|'overdue'|'no_due'|'due_future'
   // Subtask state
   const [expandedSubtaskIds, setExpandedSubtaskIds] = useState(new Set());
   const [subtaskData, setSubtaskData] = useState({});   // todoId → subtask[]
@@ -499,15 +501,38 @@ export default function TodoWindow() {
     };
   }, [isResizing, resizeStart]);
 
-  // Filter todos by search text
+  // Filter todos by search text + category + date state
   const filteredTodos = todos.filter((t) => {
-    if (!searchText.trim()) return true;
-    const keyword = searchText.toLowerCase();
-    return (
-      t.text.toLowerCase().includes(keyword) ||
-      (t.note && t.note.toLowerCase().includes(keyword)) ||
-      (t.category && t.category.toLowerCase().includes(keyword))
-    );
+    // Text search
+    if (searchText.trim()) {
+      const keyword = searchText.toLowerCase();
+      if (!t.text.toLowerCase().includes(keyword) &&
+          !(t.note && t.note.toLowerCase().includes(keyword)) &&
+          !(t.category && t.category.toLowerCase().includes(keyword))) return false;
+    }
+    // Category filter
+    if (filterCategory && t.category !== filterCategory) return false;
+    // Date filter
+    if (filterDate) {
+      const dStr = t.due_date || '';
+      const today = new Date().toISOString().slice(0, 10);
+      const dueDate = dStr.slice(0, 10);
+      switch (filterDate) {
+        case 'due_today':
+          if (dueDate !== today) return false;
+          break;
+        case 'overdue':
+          if (!dueDate || dueDate >= today) return false;
+          break;
+        case 'no_due':
+          if (dStr) return false;
+          break;
+        case 'due_future':
+          if (!dueDate || dueDate <= today) return false;
+          break;
+      }
+    }
+    return true;
   });
 
   // Separate active and completed todos
@@ -573,7 +598,7 @@ export default function TodoWindow() {
 
       {/* Search Bar */}
       {searchText || todos.length > 5 ? (
-        <div className="px-3 py-1.5 border-b border-gray-50">
+        <div className="px-3 py-1.5 border-b border-gray-50 space-y-1.5">
           <div className="relative">
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="8" />
@@ -597,6 +622,47 @@ export default function TodoWindow() {
                 </svg>
               </button>
             )}
+          </div>
+
+          {/* Filter chips */}
+          <div className="flex items-center gap-1 flex-wrap">
+            {/* Category filter */}
+            {[...new Set(todos.map((t) => t.category).filter(Boolean))].map((cat) => {
+              const active = filterCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setFilterCategory(active ? '' : cat)}
+                  className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                    active
+                      ? 'bg-sky-100 text-sky-600 font-medium'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+            {/* Date filters */}
+            {[
+              { value: '', label: '不限' },
+              { value: 'due_today', label: '今天到期' },
+              { value: 'overdue', label: '已逾期' },
+              { value: 'no_due', label: '无截止日期' },
+              { value: 'due_future', label: '未来到期' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setFilterDate(filterDate === opt.value ? '' : opt.value)}
+                className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                  filterDate === opt.value
+                    ? 'bg-amber-100 text-amber-600 font-medium'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                } ${!filterDate && opt.value === '' ? 'bg-amber-100 text-amber-600 font-medium' : ''}`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
       ) : null}
@@ -692,9 +758,13 @@ export default function TodoWindow() {
           const borderColor = todo.color ? colorMap[todo.color] : null;
           return (
           <div key={todo.id}>
-            {/* Drop indicator line */}
+            {/* Drop indicator — wider zone */}
             {dragOverId === todo.id && dragId !== todo.id && (
-              <div className="h-0.5 bg-sky-400 rounded-full mx-2 transition-all" />
+              <div className="flex items-center gap-1.5 px-2 py-0.5">
+                <div className="flex-1 h-1 bg-sky-200/60 rounded-full">
+                  <div className="h-full w-1/3 bg-sky-400 rounded-full animate-pulse" />
+                </div>
+              </div>
             )}
             <div
               draggable={editingId !== todo.id && !selectMode}
@@ -702,15 +772,38 @@ export default function TodoWindow() {
               onDragOver={(e) => handleDragOver(e, todo.id)}
               onDrop={(e) => handleDrop(e, todo.id)}
               onDragEnd={handleDragEnd}
-              className={`todo-item flex items-center gap-2 px-2 py-1.5 rounded-lg group cursor-default
+              className={`todo-item flex items-center gap-2 px-2 py-1.5 rounded-lg group cursor-default transition-all duration-200
                 ${newIds.has(todo.id) ? 'todo-enter' : ''}
                 ${exitingIds.has(todo.id) ? 'todo-exit' : ''}
-                ${dragId === todo.id ? 'opacity-40' : ''}
-                ${dragOverId === todo.id && dragId !== todo.id ? 'bg-sky-50' : ''}
+                ${dragId === todo.id ? 'opacity-30 scale-[0.97] shadow-sm' : ''}
+                ${dragOverId === todo.id && dragId !== todo.id ? 'bg-sky-50/80' : ''}
               `}
-              style={borderColor ? { borderLeft: `3px solid ${borderColor}` } : undefined}
               onContextMenu={(e) => handleContextMenu(e, todo)}
             >
+              {/* Color indicator dot + quick picker */}
+              {!editingId && (
+                <div className="relative flex-shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Cycle through colors: null → red → orange → yellow → green → null
+                      const cycle = [null, 'red', 'orange', 'yellow', 'green'];
+                      const idx = cycle.indexOf(todo.color);
+                      const next = cycle[(idx + 1) % cycle.length];
+                      handleColorChange(todo.id, next);
+                    }}
+                    className={`w-2 h-2 rounded-full transition-all hover:scale-125 ${
+                      todo.color
+                        ? (todo.color === 'red' ? 'bg-red-400' :
+                           todo.color === 'orange' ? 'bg-orange-400' :
+                           todo.color === 'yellow' ? 'bg-yellow-400' :
+                           'bg-green-400')
+                        : 'bg-gray-200 group-hover:bg-gray-300'
+                    }`}
+                    title={todo.color ? `优先级: ${todo.color}` : '点击标记优先级'}
+                  />
+                </div>
+              )}
               {/* Checkbox (select mode) */}
               {selectMode && (
                 <input

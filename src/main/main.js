@@ -529,10 +529,16 @@ function setupIPC() {
   });
 
   // Quick add todo (from quick add window)
-  ipcMain.handle('db:quickAdd', (e, text) => {
+  ipcMain.handle('db:quickAdd', (e, text, category, dueDate) => {
     if (!text || typeof text !== 'string' || !text.trim()) return { success: false };
     try {
       const todo = db.addTodo(text.trim());
+      if (category && todo && todo.id) {
+        db.updateCategory(todo.id, category);
+      }
+      if (dueDate && todo && todo.id) {
+        db.setDueDate(todo.id, dueDate + ' 23:59:59');
+      }
       // Notify float window to refresh
       if (floatWindow && !floatWindow.isDestroyed()) {
         floatWindow.webContents.send('data-changed');

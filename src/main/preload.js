@@ -41,7 +41,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   testNotification: () => ipcRenderer.invoke('notification:test'),
 
   // Quick add
-  quickAdd: (text) => ipcRenderer.invoke('db:quickAdd', text),
+  quickAdd: (text, category, dueDate) => ipcRenderer.invoke('db:quickAdd', text, category, dueDate),
   closeQuickAdd: () => ipcRenderer.invoke('quickadd:close'),
   exportCsv: (filters) => ipcRenderer.invoke('export:csv', filters),
 
