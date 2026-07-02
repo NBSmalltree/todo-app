@@ -81,32 +81,55 @@ export default function PomodoroPanel({ todos }) {
   const offset = circumference - (progress / 100) * circumference;
 
   return (
-    <div className={`mb-3 rounded-xl border transition-all ${expanded ? borderColor : 'border-gray-200'}`}>
-      {/* Collapsed header bar */}
+    <div className={`mb-3 rounded-xl border transition-all ${expanded ? borderColor : state.isRunning ? borderColor + ' ' + bgColor : 'border-gray-200'}`}>
+      {/* Collapsed header bar — always toggleable */}
       <button
         type="button"
-        onClick={() => { if (!state.isRunning && !state.isPaused) setExpanded(!expanded); else setExpanded(true); }}
-        className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors rounded-t-xl ${
-          expanded ? `border-b ${borderColor} ${bgColor}` : 'rounded-xl hover:bg-gray-50'
+        onClick={() => setExpanded(!expanded)}
+        className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors rounded-t-xl ${
+          expanded ? `border-b ${borderColor} ${bgColor}` : state.isRunning ? `${bgColor} rounded-t-xl` : 'rounded-xl hover:bg-gray-50'
         }`}
       >
-        <span className="text-base">🍅</span>
+        <span className="text-base">{isFocus ? '🍅' : '☕'}</span>
         <span className="text-sm font-medium text-gray-700">番茄钟</span>
         {state.isRunning && (
-          <span className={`text-xs font-semibold ${accentColor}`}>
-            {formatTime(state.timeRemaining)}
-            {state.isPaused && ' (暂停)'}
+          <span className={`text-xs font-semibold tabular-nums ${accentColor}`}>
+            {formatTime(state.timeRemaining)}{state.isPaused ? ' 暂停' : ''}
           </span>
         )}
-        {state.cyclesCompleted > 0 && !state.isRunning && (
-          <span className="text-xs text-gray-400">今日完成 {state.cyclesCompleted} 个</span>
+        {state.isRunning && state.taskText && (
+          <span className="text-[10px] text-gray-400 truncate flex-1">{state.taskText}</span>
         )}
-        <svg
-          className={`w-4 h-4 ml-auto text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-        >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
+        {state.cyclesCompleted > 0 && !state.isRunning && (
+          <span className="text-xs text-gray-400">完成 {state.cyclesCompleted} 个</span>
+        )}
+        <div className="flex items-center gap-1 ml-auto">
+          {state.isRunning && (
+            <>
+              {state.isPaused ? (
+                <span onClick={(e) => { e.stopPropagation(); handleResume(); }}
+                  className={`text-[10px] px-1.5 py-0.5 rounded ${isFocus ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
+                  继续
+                </span>
+              ) : (
+                <span onClick={(e) => { e.stopPropagation(); handlePause(); }}
+                  className={`text-[10px] px-1.5 py-0.5 rounded ${isFocus ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
+                  暂停
+                </span>
+              )}
+              <span onClick={(e) => { e.stopPropagation(); handleStop(); }}
+                className="text-[10px] px-1 py-0.5 rounded text-gray-400 border border-gray-200 hover:bg-gray-50">
+                结束
+              </span>
+            </>
+          )}
+          <svg
+            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </div>
       </button>
 
       {/* Expanded content */}
@@ -180,52 +203,18 @@ export default function PomodoroPanel({ todos }) {
             )}
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center justify-center gap-2">
-            {!state.isRunning && !state.isPaused ? (
+          {/* Action buttons — only "开始专注" when not running; header has controls when running */}
+          {!state.isRunning && !state.isPaused && (
+            <div className="flex items-center justify-center gap-2">
               <button
                 type="button"
                 onClick={handleStart}
-                className={`px-5 py-2 text-sm font-medium text-white rounded-lg transition-colors ${isFocus ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}
+                className="px-5 py-2 text-sm font-medium text-white bg-rose-500 hover:bg-rose-600 rounded-lg transition-colors"
               >
                 开始专注
               </button>
-            ) : state.isPaused ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleResume}
-                  className={`px-5 py-2 text-sm font-medium text-white rounded-lg transition-colors ${isFocus ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}
-                >
-                  继续
-                </button>
-                <button
-                  type="button"
-                  onClick={handleStop}
-                  className="px-4 py-2 text-sm font-medium text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  结束
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={handlePause}
-                  className={`px-5 py-2 text-sm font-medium text-white rounded-lg transition-colors ${isFocus ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}
-                >
-                  暂停
-                </button>
-                <button
-                  type="button"
-                  onClick={handleStop}
-                  className="px-4 py-2 text-sm font-medium text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  结束
-                </button>
-              </>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

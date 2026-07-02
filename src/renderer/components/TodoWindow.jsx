@@ -25,8 +25,9 @@ export default function TodoWindow() {
     const [edgeState, setEdgeState] = useState({ snapped: false, edge: null, hidden: false });
   const [searchText, setSearchText] = useState('');     // 搜索文本
   const searchInputRef = useRef(null);                  // 搜索输入框 ref
+  const [showSearch, setShowSearch] = useState(false);  // 搜索结果/筛选 UI 是否展开
   const [filterCategory, setFilterCategory] = useState('');  // 分类筛选
-  const [filterDate, setFilterDate] = useState('');          // 日期筛选: ''|'due_today'|'overdue'|'no_due'|'due_future'
+  const [filterDate, setFilterDate] = useState('');          // 日期筛选
   // Subtask state
   const [expandedSubtaskIds, setExpandedSubtaskIds] = useState(new Set());
   const [subtaskData, setSubtaskData] = useState({});   // todoId → subtask[]
@@ -147,19 +148,20 @@ export default function TodoWindow() {
     return () => window.removeEventListener('click', handleClick);
   }, []);
 
-  // Global shortcut: Ctrl/Cmd+F to focus search
+  // Global shortcut: Ctrl/Cmd+F to toggle search
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
-        if (todos.length > 5 || searchText) {
-          searchInputRef.current?.focus();
-        }
+        setShowSearch((prev) => {
+          if (!prev) setTimeout(() => searchInputRef.current?.focus(), 50);
+          return !prev;
+        });
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [todos.length, searchText]);
+  }, []);
 
   const loadTodos = async () => {
     try {
@@ -557,6 +559,17 @@ export default function TodoWindow() {
         </div>
         <div className="flex items-center gap-1">
           <button
+            onClick={() => setShowSearch(!showSearch)}
+            className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
+              showSearch ? 'bg-sky-100 text-sky-600' : 'hover:bg-gray-200/60 text-gray-400 hover:text-gray-600'
+            }`}
+            title="搜索 (Cmd+F)"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+            </svg>
+          </button>
+          <button
             onClick={() => {
               setSelectMode(!selectMode);
               setSelectedIds(new Set());
@@ -596,8 +609,8 @@ export default function TodoWindow() {
         </div>
       </div>
 
-      {/* Search Bar */}
-      {searchText || todos.length > 5 ? (
+      {/* Search Bar — only visible when toggled */}
+      {showSearch && (
         <div className="px-3 py-1.5 border-b border-gray-50 space-y-1.5">
           <div className="relative">
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -626,7 +639,6 @@ export default function TodoWindow() {
 
           {/* Filter chips */}
           <div className="flex items-center gap-1 flex-wrap">
-            {/* Category filter */}
             {[...new Set(todos.map((t) => t.category).filter(Boolean))].map((cat) => {
               const active = filterCategory === cat;
               return (
@@ -634,16 +646,13 @@ export default function TodoWindow() {
                   key={cat}
                   onClick={() => setFilterCategory(active ? '' : cat)}
                   className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
-                    active
-                      ? 'bg-sky-100 text-sky-600 font-medium'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    active ? 'bg-sky-100 text-sky-600 font-medium' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                   }`}
                 >
                   {cat}
                 </button>
               );
             })}
-            {/* Date filters */}
             {[
               { value: '', label: '不限' },
               { value: 'due_today', label: '今天到期' },
@@ -655,9 +664,7 @@ export default function TodoWindow() {
                 key={opt.value}
                 onClick={() => setFilterDate(filterDate === opt.value ? '' : opt.value)}
                 className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
-                  filterDate === opt.value
-                    ? 'bg-amber-100 text-amber-600 font-medium'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  filterDate === opt.value ? 'bg-amber-100 text-amber-600 font-medium' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 } ${!filterDate && opt.value === '' ? 'bg-amber-100 text-amber-600 font-medium' : ''}`}
               >
                 {opt.label}
@@ -665,7 +672,7 @@ export default function TodoWindow() {
             ))}
           </div>
         </div>
-      ) : null}
+      )}
 
       {/* Selection Bar */}
       {selectMode && (
@@ -1164,9 +1171,10 @@ export default function TodoWindow() {
       </div>
 
       {/* Footer with count */}
-      <div className="px-3 py-1.5 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-400 flex justify-between">
-        <span>{activeTodos.length} 项待办</span>
-        <span>{completedTodos.length} 项已完成</span>
+      <div className="px-3 py-1 bg-gray-50/50 border-t border-gray-100 text-[10px] text-gray-400 flex items-center gap-2">
+        <span>{activeTodos.length} 待办</span>
+        <span className="text-gray-300">·</span>
+        <span>{completedTodos.length} 已完成</span>
       </div>
 
       {/* Context Menu */}
