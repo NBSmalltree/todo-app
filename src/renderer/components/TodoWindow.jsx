@@ -36,6 +36,8 @@ export default function TodoWindow() {
   const [futureTodos, setFutureTodos] = useState([]);
   const [showFutureSection, setShowFutureSection] = useState(false);
   const [scheduledPickerId, setScheduledPickerId] = useState(null); // todo id being scheduled
+  const [showCompleted, setShowCompleted] = useState(false); // 已完成任务折叠
+  const [undoToast, setUndoToast] = useState(null); // { message, undoAction, timeoutId }
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const editInputRef = useRef(null);
@@ -246,6 +248,7 @@ export default function TodoWindow() {
         return next;
       });
       await loadTodos();
+      showUndoToast('已删除', () => electronAPI.recoverTodo(id));
     } catch (error) {
       console.error('Failed to delete todo:', error);
     }
@@ -255,9 +258,28 @@ export default function TodoWindow() {
     try {
       await electronAPI.archiveTodo(id);
       await loadTodos();
+      showUndoToast('已归档', () => electronAPI.restoreTodo(id));
     } catch (error) {
       console.error('Failed to archive todo:', error);
     }
+  };
+
+  const showUndoToast = (message, undoAction) => {
+    if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
+    const timeoutId = setTimeout(() => setUndoToast(null), 5000);
+    setUndoToast({
+      message,
+      undoAction: async () => {
+        try {
+          await undoAction();
+        } catch (e) {
+          console.error('Undo action failed:', e);
+        }
+        setUndoToast(null);
+        await loadTodos();
+      },
+      timeoutId,
+    });
   };
 
   const handleContextMenu = (e, todo) => {
@@ -697,11 +719,16 @@ export default function TodoWindow() {
           <div className="flex items-center gap-2">
             <button
               onClick={async () => {
-                for (const id of [...selectedIds]) {
+                const ids = [...selectedIds];
+                for (const id of ids) {
                   try { await electronAPI.deleteTodo(id); } catch (e) {}
                 }
                 setSelectedIds(new Set());
                 await loadTodos();
+                showUndoToast(`已删除 ${ids.length} 项`, async () => {
+                  for (const id of ids) await electronAPI.recoverTodo(id);
+                  await loadTodos();
+                });
               }}
               disabled={selectedIds.size === 0}
               className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -1058,62 +1085,77 @@ export default function TodoWindow() {
           );
         })}
 
-        {/* Separator if both sections have items */}
-        {activeTodos.length > 0 && completedTodos.length > 0 && (
-          <div className="flex items-center gap-2 px-2 py-1 my-1">
-            <div className="flex-1 h-px bg-gray-100" />
-            <span className="text-xs text-gray-400">已完成</span>
-            <div className="flex-1 h-px bg-gray-100" />
+        {/* 可折叠的已完成区域 */}
+        {completedTodos.length > 0 && (
+          <div className="mt-1 border-t border-gray-100">
+            <button
+              onClick={() => setShowCompleted(!showCompleted)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-gray-50/50 transition-colors rounded"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-sky-400" stroke="currentColor" strokeWidth="2.5">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <path d="M8 12l3 3 5-6" />
+              </svg>
+              <span className="text-xs font-medium text-gray-500">已完成 {completedTodos.length} 项</span>
+              <svg
+                className={`w-3 h-3 ml-auto text-gray-400 transition-transform ${showCompleted ? 'rotate-180' : ''}`}
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            {showCompleted && (
+              <div>
+                {completedTodos.map((todo) => (
+                  <div
+                    key={todo.id}
+                    className={`todo-item flex items-center gap-2 px-2 py-1.5 rounded-lg group cursor-default ${newIds.has(todo.id) ? 'todo-enter' : ''} ${exitingIds.has(todo.id) ? 'todo-exit' : ''}`}
+                    onContextMenu={(e) => handleContextMenu(e, todo)}
+                  >
+                    <button
+                      onClick={() => handleRestore(todo.id)}
+                      className={`flex-shrink-0 w-5 h-5 rounded-full border-2 border-sky-400 bg-sky-400 transition-colors flex items-center justify-center ${checkPulseIds.has(todo.id) ? 'todo-check-animate' : ''}`}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                        <path d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                    {editingId === todo.id ? (
+                      <input
+                        ref={editInputRef}
+                        type="text"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => handleEditKeyDown(e, todo.id)}
+                        onBlur={() => handleSaveEdit(todo.id)}
+                        onCompositionStart={() => { isComposingRef.current = true; }}
+                        onCompositionEnd={() => { isComposingRef.current = false; }}
+                        autoFocus
+                        className="flex-1 min-w-0 px-1.5 py-0.5 text-sm bg-gray-50 rounded border border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200 transition-all"
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={(e) => handleDoubleClick(e, todo)}
+                        className="flex-1 text-sm text-gray-400 line-through truncate cursor-default"
+                        title="双击编辑"
+                      >
+                        {todo.text}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => handleDelete(todo.id)}
+                      className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
-
-        {/* Completed Todos */}
-        {completedTodos.map((todo) => (
-          <div
-            key={todo.id}
-            className={`todo-item flex items-center gap-2 px-2 py-1.5 rounded-lg group cursor-default ${newIds.has(todo.id) ? 'todo-enter' : ''} ${exitingIds.has(todo.id) ? 'todo-exit' : ''}`}
-            onContextMenu={(e) => handleContextMenu(e, todo)}
-          >
-            <button
-              onClick={() => handleRestore(todo.id)}
-              className={`flex-shrink-0 w-5 h-5 rounded-full border-2 border-sky-400 bg-sky-400 transition-colors flex items-center justify-center ${checkPulseIds.has(todo.id) ? 'todo-check-animate' : ''}`}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                <path d="M5 13l4 4L19 7" />
-              </svg>
-            </button>
-            {editingId === todo.id ? (
-              <input
-                ref={editInputRef}
-                type="text"
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                onKeyDown={(e) => handleEditKeyDown(e, todo.id)}
-                onBlur={() => handleSaveEdit(todo.id)}
-                onCompositionStart={() => { isComposingRef.current = true; }}
-                onCompositionEnd={() => { isComposingRef.current = false; }}
-                autoFocus
-                className="flex-1 min-w-0 px-1.5 py-0.5 text-sm bg-gray-50 rounded border border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200 transition-all"
-              />
-            ) : (
-              <span
-                onDoubleClick={(e) => handleDoubleClick(e, todo)}
-                className="flex-1 text-sm text-gray-400 line-through truncate cursor-default"
-                title="双击编辑"
-              >
-                {todo.text}
-              </span>
-            )}
-            <button
-              onClick={() => handleDelete(todo.id)}
-              className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        ))}
 
         {/* Future scheduled tasks section */}
         {futureTodos.length > 0 && (
@@ -1169,6 +1211,19 @@ export default function TodoWindow() {
           </div>
         )}
       </div>
+
+      {/* Undo Toast */}
+      {undoToast && (
+        <div className="absolute bottom-8 left-2 right-2 flex items-center gap-2 px-3 py-2 bg-gray-800 text-white rounded-lg shadow-lg text-xs animate-slideUp z-50">
+          <span>{undoToast.message}</span>
+          <button
+            onClick={undoToast.undoAction}
+            className="ml-auto font-medium text-sky-300 hover:text-sky-200 transition-colors"
+          >
+            撤销
+          </button>
+        </div>
+      )}
 
       {/* Footer with count */}
       <div className="px-3 py-1 bg-gray-50/50 border-t border-gray-100 text-[10px] text-gray-400 flex items-center gap-2">

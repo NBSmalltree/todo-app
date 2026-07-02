@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addTodo: (text) => ipcRenderer.invoke('db:addTodo', text),
   toggleTodo: (id) => ipcRenderer.invoke('db:toggleTodo', id),
   deleteTodo: (id) => ipcRenderer.invoke('db:deleteTodo', id),
+  recoverTodo: (id) => ipcRenderer.invoke('db:recoverTodo', id),
   restoreTodo: (id) => ipcRenderer.invoke('db:restoreTodo', id),
   archiveTodo: (id) => ipcRenderer.invoke('db:archiveTodo', id),
   getArchived: (filters) => ipcRenderer.invoke('db:getArchived', filters),

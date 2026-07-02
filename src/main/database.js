@@ -166,6 +166,10 @@ class TodoDatabase {
         version: 8,
         sql: "ALTER TABLE todos ADD COLUMN scheduled_date TEXT",
       },
+      {
+        version: 9,
+        sql: "ALTER TABLE todos ADD COLUMN deleted INTEGER DEFAULT 0; ALTER TABLE todos ADD COLUMN deleted_at TEXT",
+      },
     ];
 
     const insertVersion = this.db.prepare('INSERT OR IGNORE INTO schema_version (version) VALUES (?)');
@@ -204,7 +208,7 @@ class TodoDatabase {
   getTodos() {
     try {
       return this.db
-        .prepare('SELECT * FROM todos WHERE archived = 0 ORDER BY completed ASC, sort_order ASC, created_at DESC')
+        .prepare('SELECT * FROM todos WHERE archived = 0 AND deleted = 0 ORDER BY completed ASC, sort_order ASC, created_at DESC')
         .all();
     } catch (e) {
       console.error('getTodos failed:', e);
@@ -219,7 +223,7 @@ class TodoDatabase {
       return this.db
         .prepare(
           `SELECT * FROM todos
-           WHERE archived = 0
+           WHERE archived = 0 AND deleted = 0
              AND (scheduled_date IS NULL OR scheduled_date <= ?)
            ORDER BY completed ASC, sort_order ASC, created_at DESC`
         )
@@ -237,7 +241,7 @@ class TodoDatabase {
       return this.db
         .prepare(
           `SELECT * FROM todos
-           WHERE archived = 0 AND completed = 0
+           WHERE archived = 0 AND completed = 0 AND deleted = 0
              AND scheduled_date IS NOT NULL AND scheduled_date > ?
            ORDER BY scheduled_date ASC, sort_order ASC`
         )
@@ -318,11 +322,21 @@ class TodoDatabase {
 
   deleteTodo(id) {
     try {
-      this.db.prepare('DELETE FROM todos WHERE id = ?').run(id);
+      this.db.prepare('UPDATE todos SET deleted = 1, deleted_at = ? WHERE id = ?').run(nowBeijing(), id);
       return { success: true };
     } catch (e) {
       console.error('deleteTodo failed:', e);
       return { success: false, error: e.message };
+    }
+  }
+
+  recoverTodo(id) {
+    try {
+      this.db.prepare('UPDATE todos SET deleted = 0, deleted_at = NULL WHERE id = ?').run(id);
+      return this.db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
+    } catch (e) {
+      console.error('recoverTodo failed:', e);
+      return null;
     }
   }
 
@@ -352,7 +366,7 @@ class TodoDatabase {
 
   getArchived(filters = {}) {
     try {
-      let query = 'SELECT * FROM todos WHERE archived = 1';
+      let query = 'SELECT * FROM todos WHERE archived = 1 AND deleted = 0';
       const params = [];
 
       if (filters.category && filters.category !== 'all') {
@@ -427,7 +441,7 @@ class TodoDatabase {
   getCategories() {
     try {
       return this.db
-        .prepare('SELECT DISTINCT category FROM todos WHERE archived = 1 AND category IS NOT NULL')
+        .prepare('SELECT DISTINCT category FROM todos WHERE archived = 1 AND deleted = 0 AND category IS NOT NULL')
         .all()
         .map((r) => r.category);
     } catch (e) {
@@ -462,7 +476,7 @@ class TodoDatabase {
       const items = this.db
         .prepare(
           `SELECT * FROM todos
-           WHERE archived = 1 AND archived_at >= ?
+           WHERE archived = 1 AND deleted = 0 AND archived_at >= ?
            ORDER BY archived_at DESC`
         )
         .all(dateFilter);
@@ -487,7 +501,7 @@ class TodoDatabase {
                   SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) as archived,
                   SUM(CASE WHEN archived = 0 AND completed = 1 THEN 1 ELSE 0 END) as completed,
                   SUM(CASE WHEN archived = 0 AND completed = 0 THEN 1 ELSE 0 END) as active
-           FROM todos`
+           FROM todos WHERE deleted = 0`
         )
         .get();
 
@@ -516,7 +530,7 @@ class TodoDatabase {
       const rows = this.db
         .prepare(
           `SELECT * FROM todos
-           WHERE archived = 0 AND completed = 0
+           WHERE archived = 0 AND completed = 0 AND deleted = 0
              AND due_date IS NOT NULL AND due_date != ''
              AND due_date <= ? AND due_date > ?
            ORDER BY due_date ASC`

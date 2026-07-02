@@ -19,6 +19,7 @@ export default function ArchiveViewer() {
   const [searchInputValue, setSearchInputValue] = useState(filters.searchText);
   const [categorizingId, setCategorizingId] = useState(null); // Track which item is being categorized
   const [toast, setToast] = useState(null); // Toast message and type
+  const [undoToast, setUndoToast] = useState(null); // { message, undoAction, timeoutId }
   const [scale, setScale] = useState(1); // Scale state for zoom
   const [selectMode, setSelectMode] = useState(false);       // 批量选择模式
   const [selectedIds, setSelectedIds] = useState(new Set());  // 已选中的归档 id
@@ -26,6 +27,7 @@ export default function ArchiveViewer() {
   const searchDebounceRef = useRef(null);
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
+  const searchInputRef = useRef(null);
 
   useEffect(() => {
     loadArchives();
@@ -76,6 +78,18 @@ export default function ArchiveViewer() {
     });
   }, []);
 
+  // Cmd/Ctrl+F to focus search input (only active when this tab is mounted)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const loadArchives = async () => {
     setIsLoading(true);
     try {
@@ -105,6 +119,25 @@ export default function ArchiveViewer() {
       setToast(null);
     }, 3000);
   }, []);
+
+  const showUndoToast = (message, undoAction) => {
+    if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
+    const timeoutId = setTimeout(() => setUndoToast(null), 5000);
+    setUndoToast({
+      message,
+      undoAction: async () => {
+        try {
+          await undoAction();
+        } catch (e) {
+          console.error('Undo action failed:', e);
+        }
+        setUndoToast(null);
+        await loadArchives();
+        await loadCategories();
+      },
+      timeoutId,
+    });
+  };
   
   const handleNoteDoubleClick = (item) => {
     setEditingNote(item.id);
@@ -172,6 +205,7 @@ export default function ArchiveViewer() {
       await electronAPI.deleteTodo(id);
       await loadArchives();
       await loadCategories();
+      showUndoToast('已删除', () => electronAPI.recoverTodo(id));
     } catch (error) {
       console.error('Failed to delete:', error);
     }
@@ -235,6 +269,21 @@ export default function ArchiveViewer() {
         </div>
       )}
 
+      {/* Undo Toast */}
+      {undoToast && (
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 animate-slideUp">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-800 text-white rounded-lg shadow-lg text-sm font-medium">
+            <span>{undoToast.message}</span>
+            <button
+              onClick={undoToast.undoAction}
+              className="font-medium text-sky-300 hover:text-sky-200 transition-colors"
+            >
+              撤销
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Filter Bar */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
         <div className="flex flex-wrap gap-3 items-end">
@@ -243,6 +292,7 @@ export default function ArchiveViewer() {
             <label className="block text-xs text-gray-500 mb-1">搜索</label>
             <input
               type="text"
+              ref={searchInputRef}
               value={searchInputValue}
               onChange={(e) => setSearchInputValue(e.target.value)}
               placeholder="搜索任务或备注..."
@@ -370,12 +420,18 @@ export default function ArchiveViewer() {
             </button>
             <button
               onClick={async () => {
-                for (const id of [...selectedIds]) {
+                const ids = [...selectedIds];
+                for (const id of ids) {
                   try { await electronAPI.deleteTodo(id); } catch (e) {}
                 }
                 setSelectedIds(new Set());
                 await loadArchives();
                 await loadCategories();
+                showUndoToast(`已删除 ${ids.length} 项`, async () => {
+                  for (const id of ids) await electronAPI.recoverTodo(id);
+                  await loadArchives();
+                  await loadCategories();
+                });
               }}
               disabled={selectedIds.size === 0}
               className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

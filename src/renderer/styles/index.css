@@ -346,3 +346,10 @@ input, textarea {
 [data-theme="eye-care"] ::-webkit-scrollbar-thumb:hover {
   background: #a89880;
 }
+
+/* Undo toast animation */
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.animate-slideUp { animation: slideUp 0.25s ease-out; }

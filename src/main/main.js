@@ -326,6 +326,14 @@ function setupIPC() {
     if (!isPositiveInt(id)) return { success: false, error: 'Invalid id' };
     return db.deleteTodo(id);
   });
+  ipcMain.handle('db:recoverTodo', (e, id) => {
+    if (!isPositiveInt(id)) return null;
+    const result = db.recoverTodo(id);
+    if (floatWindow && !floatWindow.isDestroyed()) {
+      floatWindow.webContents.send('data-changed');
+    }
+    return result;
+  });
   ipcMain.handle('db:restoreTodo', (e, id) => {
     if (!isPositiveInt(id)) return null;
     const result = db.restoreTodo(id);
