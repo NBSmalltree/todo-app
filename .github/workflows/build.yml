@@ -40,7 +40,7 @@ jobs:
           path: dist-electron-arm64/*.dmg
 
   build-mac-x64:
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -56,6 +56,11 @@ jobs:
 
       - name: Build renderer
         run: npm run build:renderer
+
+      - name: Rebuild native modules for x64
+        run: npx electron-rebuild -f -w better-sqlite3 --arch x64 -v 33.4.11
+        env:
+          npm_config_arch: x64
 
       - name: Build Electron app (x64)
         run: npx electron-builder --mac --x64 --publish never
