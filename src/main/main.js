@@ -1,7 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, dialog, globalShortcut } = require('electron');
 const path = require('path');
 const Database = require('./database');
-const EdgeManager = require('./edgeManager');
 
 // Keep a global reference to prevent garbage collection
 let floatWindow = null;
@@ -10,7 +9,6 @@ let settingsWindow = null;
 let quickAddWindow = null;
 let tray = null;
 let db = null;
-let edgeManager = null;
 
 // Store window scale state
 let windowScale = 1.0;
@@ -26,7 +24,6 @@ function isDev() {
 function createFloatWindow() {
   // Read saved window bounds, fallback to defaults
   let bounds = { x: 100, y: 100, width: BASE_WIDTH, height: BASE_HEIGHT };
-  let savedEdgeState = null;
   try {
     if (!db) {
       console.warn('[Main] Database not initialized, using default bounds');
@@ -37,11 +34,6 @@ function createFloatWindow() {
           ? JSON.parse(settings.window_bounds)
           : settings.window_bounds;
         bounds = { ...bounds, ...saved };
-      }
-      if (settings.edge_state) {
-        savedEdgeState = typeof settings.edge_state === 'string'
-          ? JSON.parse(settings.edge_state)
-          : settings.edge_state;
       }
     }
   } catch (e) {
@@ -111,31 +103,7 @@ function createFloatWindow() {
     floatWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   }
 
-  // Initialize edge manager
-  edgeManager = new EdgeManager(floatWindow);
-  edgeManager.loadSettings(db);
-
-  // Add move and resize event listeners for edge detection
-  floatWindow.on('move', () => {
-    if (edgeManager) edgeManager.onWindowMoved();
-  });
-
-  floatWindow.on('resize', () => {
-    if (edgeManager) edgeManager.onWindowResized();
-  });
-
-  // Restore edge state after renderer is fully ready
-  if (savedEdgeState && savedEdgeState.edge) {
-    floatWindow.webContents.on('did-finish-load', () => {
-      if (edgeManager) edgeManager.restoreState(savedEdgeState);
-    });
-  }
-
   floatWindow.on('closed', () => {
-    if (edgeManager) {
-      edgeManager.destroy();
-      edgeManager = null;
-    }
     floatWindow = null;
   });
 
@@ -239,12 +207,7 @@ function createTray() {
       label: '待办清单',
       click: () => {
         if (floatWindow) {
-          // If window is hidden by edge manager, show it
-          if (edgeManager && edgeManager.state === 'HIDDEN') {
-            edgeManager.showWindow();
-          } else {
-            floatWindow.show();
-          }
+          floatWindow.show();
           floatWindow.focus();
         }
       },
@@ -480,20 +443,6 @@ function setupIPC() {
     }
   });
 
-  // Edge management
-  ipcMain.handle('edge:toggleHide', () => {
-    if (edgeManager) edgeManager.toggleHide();
-  });
-
-  ipcMain.handle('edge:getSettings', () => {
-    if (edgeManager) return edgeManager.getSettings();
-    return { edge_snap_enabled: true, edge_hide_delay: 3000, edge_snap_threshold: 20 };
-  });
-
-  ipcMain.handle('edge:saveSettings', (e, settings) => {
-    if (edgeManager) edgeManager.saveSettings(db, settings);
-  });
-
   // LLM categorization
   ipcMain.handle('llm:categorize', async (e, text) => {
     try {
@@ -710,10 +659,6 @@ function setupIPC() {
   ipcMain.handle('window:close', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) {
-      // If edge manager is active, un-snap before hiding
-      if (edgeManager && win === floatWindow && edgeManager.state !== 'FREE') {
-        edgeManager.unSnap();
-      }
       win.hide();
     }
   });
@@ -864,11 +809,7 @@ function registerShortcuts() {
     globalShortcut.register(toggleShortcut, () => {
       if (floatWindow) {
         if (floatWindow.isVisible() && !floatWindow.isMinimized()) {
-          if (edgeManager && edgeManager.state === 'HIDDEN') {
-            edgeManager.showWindow();
-          } else {
-            floatWindow.hide();
-          }
+          floatWindow.hide();
         } else {
           floatWindow.show();
           floatWindow.focus();
@@ -1316,22 +1257,8 @@ app.on('before-quit', () => {
       const [x, y] = floatWindow.getPosition();
       const settingsToSave = { window_bounds: JSON.stringify({ x, y, width, height }) };
 
-      // Save edge state if snapped
-      if (edgeManager) {
-        const edgeState = edgeManager.getState();
-        if (edgeState) {
-          settingsToSave.edge_state = JSON.stringify(edgeState);
-        } else {
-          settingsToSave.edge_state = null;
-        }
-      }
-
       db.saveSettings(settingsToSave);
     } catch (e) { /* ignore */ }
-  }
-  if (edgeManager) {
-    edgeManager.destroy();
-    edgeManager = null;
   }
   if (db) db.close();
 });

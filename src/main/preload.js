@@ -78,11 +78,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('pomodoro:stateChanged', handler);
   },
 
-  // Theme
-  toggleEdgeHide: () => ipcRenderer.invoke('edge:toggleHide'),
-  getEdgeSettings: () => ipcRenderer.invoke('edge:getSettings'),
-  saveEdgeSettings: (settings) => ipcRenderer.invoke('edge:saveSettings', settings),
-
   // App functions
   backupDatabase: () => ipcRenderer.invoke('app:backupDatabase'),
   restoreDatabase: () => ipcRenderer.invoke('app:restoreDatabase'),
@@ -112,10 +107,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (e, opacity) => callback(opacity);
     ipcRenderer.on('opacity-changed', handler);
     return () => ipcRenderer.removeListener('opacity-changed', handler);
-  },
-  onEdgeStateChanged: (callback) => {
-    const handler = (e, state) => callback(state);
-    ipcRenderer.on('edge:stateChanged', handler);
-    return () => ipcRenderer.removeListener('edge:stateChanged', handler);
   },
 });

@@ -22,7 +22,6 @@ export default function TodoWindow() {
     const [datePickerId, setDatePickerId] = useState(null); // 正在设置截止日期的 todo id
     const [selectMode, setSelectMode] = useState(false);       // 批量选择模式
     const [selectedIds, setSelectedIds] = useState(new Set());  // 已选中的 todo id
-    const [edgeState, setEdgeState] = useState({ snapped: false, edge: null, hidden: false });
   const [searchText, setSearchText] = useState('');     // 搜索文本
   const searchInputRef = useRef(null);                  // 搜索输入框 ref
   const [showSearch, setShowSearch] = useState(false);  // 搜索结果/筛选 UI 是否展开
@@ -42,7 +41,6 @@ export default function TodoWindow() {
   const listRef = useRef(null);
   const editInputRef = useRef(null);
   const isComposingRef = useRef(false); // Track IME composition state
-  const edgeSeqRef = useRef(0); // Track edge notification ordering
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
 
@@ -98,14 +96,6 @@ export default function TodoWindow() {
     // Listen for opacity changes from settings
     electronAPI?.onOpacityChanged?.((v) => {
       setOpacity(v);
-    });
-
-    // Listen for edge state changes (ordered by seq to avoid stale notifications)
-    electronAPI?.onEdgeStateChanged?.((state) => {
-      if ((state.seq || 0) >= edgeSeqRef.current) {
-        edgeSeqRef.current = state.seq || 0;
-        setEdgeState(state);
-      }
     });
   }, []);
 
@@ -571,10 +561,6 @@ export default function TodoWindow() {
   return (
     <div className="h-full overflow-hidden" style={{ opacity }}>
       <div className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 relative">
-      {/* Edge snap indicator */}
-      {edgeState.snapped && edgeState.edge && (
-        <div className={`snap-indicator ${edgeState.edge}`} />
-      )}
       {/* Title Bar - Draggable */}
       <div className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100">
         <div className="flex items-center gap-2">
@@ -634,6 +620,31 @@ export default function TodoWindow() {
             </svg>
           </button>
         </div>
+      </div>
+
+      {/* Quick filter bar — always visible */}
+      <div className="flex gap-0.5 px-3 py-1 border-b border-gray-50 bg-white">
+        {[
+          { value: '', label: '全部' },
+          { value: 'due_today', label: '今天' },
+          { value: 'overdue', label: '过期' },
+          { value: 'no_due', label: '无截止日期' },
+        ].map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setFilterDate(filterDate === opt.value ? '' : opt.value)}
+            className={`text-[11px] px-2.5 py-0.5 rounded-full transition-colors ${
+              filterDate === opt.value
+                ? 'bg-sky-100 text-sky-600 font-medium'
+                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+        <span className="ml-auto text-[10px] text-gray-400 self-center">
+          {activeTodos.length} 项
+        </span>
       </div>
 
       {/* Search Bar — only visible when toggled */}
