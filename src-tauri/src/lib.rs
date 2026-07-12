@@ -55,6 +55,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
+            // Hide Dock icon — app runs as a menu-bar-only application
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             // Make windows draggable from background (title bar area).
             // Webview interactive elements (buttons, inputs) still capture
             // clicks first, so dragging only starts on empty/non-interactive areas.
