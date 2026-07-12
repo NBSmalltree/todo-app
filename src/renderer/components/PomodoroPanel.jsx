@@ -92,7 +92,7 @@ export default function PomodoroPanel({ todos }) {
           expanded ? `border-b ${borderColor} ${bgColor}` : state.isRunning ? `${bgColor} rounded-t-xl` : 'rounded-xl hover:bg-gray-50'
         }`}
       >
-        <span className="text-base">{isFocus ? '🍅' : '☕'}</span>
+        <span className="text-base">🍅</span>
         <span className="text-sm font-medium text-gray-700">番茄钟</span>
         {state.isRunning && (
           <span className={`text-xs font-semibold tabular-nums ${accentColor}`}>
