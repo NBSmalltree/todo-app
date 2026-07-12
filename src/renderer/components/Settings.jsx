@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const { electronAPI } = window;
+import api from '../api';
 
 const THEMES = [
   { id: 'light', label: '浅色模式', icon: 'sun' },
@@ -88,7 +88,7 @@ export default function Settings() {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        window.electronAPI?.closeWindow();
+        api.closeWindow();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -104,22 +104,22 @@ export default function Settings() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     try {
-      electronAPI?.applyTheme(theme);
+      api.applyTheme(theme);
       // Persist theme immediately so other windows read the correct value from DB
-      electronAPI?.saveSettings({ theme });
+      api.saveSettings({ theme });
     } catch (e) { /* ignore */ }
   }, [theme]);
 
   // Apply opacity whenever it changes
   useEffect(() => {
-    try { electronAPI?.setOpacity(opacity); } catch (e) { /* ignore */ }
+    try { api.setOpacity(opacity); } catch (e) { /* ignore */ }
   }, [opacity]);
 
 
 
   const loadSettings = async () => {
     try {
-      const data = await electronAPI.getSettings();
+      const data = await api.getSettings();
       if (data.api_key) setSettings((prev) => ({ ...prev, api_key: data.api_key }));
       if (data.api_format) setSettings((prev) => ({ ...prev, api_format: data.api_format }));
       if (data.base_url) setSettings((prev) => ({ ...prev, base_url: data.base_url }));
@@ -141,7 +141,7 @@ export default function Settings() {
 
       // Load shortcuts
       try {
-        const shortcuts = await electronAPI.getShortcuts();
+        const shortcuts = await api.getShortcuts();
         setShortcutToggle(shortcuts.toggle);
         setShortcutQuickAdd(shortcuts.quickadd);
       } catch (e) { /* ignore */ }
@@ -152,7 +152,7 @@ export default function Settings() {
 
   const handleRemindChange = async (minutes) => {
     try {
-      await electronAPI.saveSettings({ remind_minutes: minutes });
+      await api.saveSettings({ remind_minutes: minutes });
     } catch (e) { /* ignore */ }
   };
 
@@ -160,7 +160,7 @@ export default function Settings() {
     setIsSaving(true);
     setSaveMessage('');
     try {
-      await electronAPI.saveSettings({
+      await api.saveSettings({
         ...settings,
         theme,
         todo_opacity: opacity,
@@ -238,7 +238,7 @@ export default function Settings() {
     setNotifTesting(true);
     setNotifResult(null);
     try {
-      const result = await electronAPI.testNotification();
+      const result = await api.testNotification();
       setNotifResult(result);
     } catch (error) {
       setNotifResult({ success: false, error: error.message });
@@ -251,7 +251,7 @@ export default function Settings() {
     setTesting(true);
     setTestResult(null);
     try {
-      const result = await electronAPI.testLLM({
+      const result = await api.testLLM({
         api_format: settings.api_format,
         api_key: settings.api_key,
         base_url: settings.base_url,
@@ -268,18 +268,25 @@ export default function Settings() {
   };
 
   const handleClose = () => {
-    electronAPI?.closeWindow();
+    api.closeWindow();
   };
 
   const handleMinimize = () => {
-    electronAPI?.minimizeWindow();
+    api.minimizeWindow();
   };
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Title Bar - Draggable, matching TodoWindow style */}
-      <div className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100">
-        <div className="flex items-center gap-2">
+      <div
+        className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget || e.target.closest('[data-drag-area]')) {
+            api.startDragging?.();
+          }
+        }}
+      >
+        <div data-drag-area className="flex items-center gap-2">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-sky-500">
             <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="2" />
             <path d="M8 12l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -482,7 +489,7 @@ export default function Settings() {
                 defaultValue={shortcutToggle}
                 onChange={(val) => {
                   setShortcutToggle(val);
-                  electronAPI.updateShortcuts({ toggle: val, quickadd: shortcutQuickAdd }).catch(() => {});
+                  api.updateShortcuts({ toggle: val, quickadd: shortcutQuickAdd }).catch(() => {});
                 }}
               />
               <ShortcutRecorder
@@ -490,7 +497,7 @@ export default function Settings() {
                 defaultValue={shortcutQuickAdd}
                 onChange={(val) => {
                   setShortcutQuickAdd(val);
-                  electronAPI.updateShortcuts({ toggle: shortcutToggle, quickadd: val }).catch(() => {});
+                  api.updateShortcuts({ toggle: shortcutToggle, quickadd: val }).catch(() => {});
                 }}
               />
               <p className="text-xs text-gray-400">点击上方按钮，然后按下您想要设置的快捷键组合</p>
@@ -753,7 +760,7 @@ export default function Settings() {
                 <button
                   onClick={async () => {
                     try {
-                      const result = await electronAPI.backupDatabase();
+                      const result = await api.backupDatabase();
                       if (result.success) {
                         alert('备份成功！文件已保存到：' + result.path);
                       } else {
@@ -780,7 +787,7 @@ export default function Settings() {
                       return;
                     }
                     try {
-                      const result = await electronAPI.restoreDatabase();
+                      const result = await api.restoreDatabase();
                       if (result.success) {
                         alert('恢复成功！应用将重启以应用更改。');
                         // Reload the window to apply changes

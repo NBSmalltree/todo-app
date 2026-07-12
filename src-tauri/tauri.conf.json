@@ -1,0 +1,81 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicedoc/tauri/refs/heads/dev/crates/tauri-config-schema/schema.json",
+  "productName": "TodoFloat",
+  "version": "2.0.0",
+  "identifier": "com.todofloat.app",
+  "build": {
+    "frontendDist": "../build/renderer",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev:renderer",
+    "beforeBuildCommand": "npm run build:renderer"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "float",
+        "title": "TodoFloat",
+        "width": 380,
+        "height": 500,
+        "resizable": true,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visibleOnAllWorkspaces": true,
+        "center": false,
+        "url": "/"
+      },
+      {
+        "label": "tray-view",
+        "title": "TodoFloat - 历史归档",
+        "width": 900,
+        "height": 700,
+        "decorations": false,
+        "transparent": false,
+        "visible": false,
+        "url": "/#/tray"
+      },
+      {
+        "label": "settings",
+        "title": "TodoFloat - 设置",
+        "width": 500,
+        "height": 600,
+        "decorations": false,
+        "transparent": false,
+        "visible": false,
+        "url": "/#/settings"
+      },
+      {
+        "label": "quickadd",
+        "title": "Quick Add",
+        "width": 440,
+        "height": 80,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true,
+        "visible": false,
+        "url": "/#/quickadd"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost data:; connect-src 'self' ipc: http://ipc.localhost https://api.openai.com https://api.anthropic.com ws://localhost:* http://localhost:*; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+[package]
+name = "todo-float"
+version = "2.0.0"
+description = "A lightweight floating desktop todo list"
+authors = ["TodoFloat"]
+edition = "2021"
+
+[lib]
+name = "todo_float_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+rusqlite = { version = "0.31", features = ["bundled"] }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+raw-window-handle = "0.6"
+objc2 = "0.6"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+macos-private-api = ["tauri/macos-private-api"]

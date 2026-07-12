@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import api from '../api';
 
 export default function QuickAdd() {
   const [text, setText] = useState('');
@@ -7,21 +8,21 @@ export default function QuickAdd() {
   useEffect(() => {
     const loadTheme = async () => {
       try {
-        const settings = await window.electronAPI?.getSettings();
+        const settings = await api.getSettings();
         const theme = (settings?.theme && ['light', 'dark', 'eye-care'].includes(settings.theme))
           ? settings.theme : 'light';
         document.documentElement.setAttribute('data-theme', theme);
       } catch { document.documentElement.setAttribute('data-theme', 'light'); }
     };
     loadTheme();
-    const cleanup = window.electronAPI?.onThemeChanged?.((t) => {
+    const cleanup = api.onThemeChanged?.((t) => {
       document.documentElement.setAttribute('data-theme', t);
     });
     return cleanup;
   }, []);
 
   const doClose = useCallback(() => {
-    try { window.electronAPI?.closeQuickAdd(); } catch { /* ignore */ }
+    try { api.closeQuickAdd(); } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function QuickAdd() {
     const trimmed = text.trim();
     if (!trimmed) return;
     try {
-      await window.electronAPI?.quickAdd(trimmed);
+      await api.quickAdd(trimmed);
       doClose();
     } catch { /* ignore */ }
   };

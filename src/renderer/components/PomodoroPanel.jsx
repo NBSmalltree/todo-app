@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const { electronAPI } = window;
+import api from '../api';
 
 export default function PomodoroPanel({ todos }) {
   const [expanded, setExpanded] = useState(false);
@@ -21,19 +21,21 @@ export default function PomodoroPanel({ todos }) {
   // Load initial state on mount
   const loadState = async () => {
     try {
-      const s = await electronAPI.pomodoroGetState();
+      const s = await api.pomodoroGetState();
       if (mountedRef.current) setState(s);
     } catch { /* ignore */ }
   };
 
   useEffect(() => {
     loadState();
-    const cleanup = electronAPI.onPomodoroStateChanged?.((newState) => {
+    let unlistenRef = null;
+    api.onPomodoroStateChanged?.((newState) => {
       if (mountedRef.current) setState(newState);
-    });
+    }).then(fn => { if (fn) unlistenRef = fn; });
+
     return () => {
       mountedRef.current = false;
-      if (cleanup) cleanup();
+      if (unlistenRef) unlistenRef();
     };
   }, []);
 
@@ -66,12 +68,12 @@ export default function PomodoroPanel({ todos }) {
       const todo = activeTodos.find((t) => t.id === taskId);
       if (todo) taskText = todo.text;
     }
-    await electronAPI.pomodoroStart({ taskId: taskId || null, taskText });
+    await api.pomodoroStart({ taskId: taskId || null, taskText });
   };
 
-  const handlePause = async () => { await electronAPI.pomodoroPause(); };
-  const handleResume = async () => { await electronAPI.pomodoroResume(); };
-  const handleStop = async () => { await electronAPI.pomodoroStop(); };
+  const handlePause = async () => { await api.pomodoroPause(); };
+  const handleResume = async () => { await api.pomodoroResume(); };
+  const handleStop = async () => { await api.pomodoroStop(); };
 
   const activeTodos = (todos || []).filter((t) => !t.completed && !t.archived);
 

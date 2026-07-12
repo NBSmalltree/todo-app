@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import api from '../api';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import ReactMarkdown from 'react-markdown';
 
-const { electronAPI } = window;
 
 const COLORS = ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd', '#e0f2fe', '#0284c7', '#0369a1', '#075985'];
 
@@ -25,11 +25,15 @@ export default function WorkAnalysis() {
 
   useEffect(() => {
     // Listen for data changes (archive/toggle) → mark cache stale
-    const cleanup = electronAPI?.onDataChanged?.(() => {
+    let unlisten;
+    api.onDataChanged?.(() => {
       _version += 1;
       setDataVersion(_version);
-    });
-    return cleanup;
+    }).then(fn => { if (fn) unlisten = fn; });
+
+    return () => {
+      if (unlisten) unlisten();
+    };
   }, []);
 
   useEffect(() => {
@@ -40,7 +44,7 @@ export default function WorkAnalysis() {
   const loadAnalysis = async () => {
     setIsLoading(true);
     try {
-      const data = await electronAPI.getWorkAnalysis(period);
+      const data = await api.getWorkAnalysis(period);
       setAnalysis(data);
       setIsLoading(false);
 
@@ -63,7 +67,7 @@ export default function WorkAnalysis() {
   const loadPomodoroStats = async () => {
     setPomodoroLoading(true);
     try {
-      const stats = await electronAPI.pomodoroGetStats(period);
+      const stats = await api.pomodoroGetStats(period);
       setPomodoroStats(stats);
     } catch (e) { /* ignore */ }
     setPomodoroLoading(false);
@@ -72,7 +76,7 @@ export default function WorkAnalysis() {
   const generateAnalysis = async (data) => {
     setLlmLoading(true);
     try {
-      const tip = await electronAPI.analyzeWork(data);
+      const tip = await api.analyzeWork(data);
       const displayTip = tip || '暂无分析';
       setLlmTip(displayTip);
       // Save to module-level cache (survives tab switches)

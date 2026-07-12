@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ArchiveViewer from './ArchiveViewer';
 import WorkAnalysis from './WorkAnalysis';
 
-const { electronAPI } = window;
+import api from '../api';
 
 const TABS = [
   { id: 'archive', label: '历史归档', icon: 'archive' },
@@ -38,7 +38,7 @@ export default function TrayView() {
   useEffect(() => {
     const loadTheme = async () => {
       try {
-        const data = await electronAPI.getSettings();
+        const data = await api.getSettings();
         if (data.theme && ['light', 'dark', 'eye-care'].includes(data.theme)) {
           document.documentElement.setAttribute('data-theme', data.theme);
         }
@@ -46,36 +46,42 @@ export default function TrayView() {
     };
     loadTheme();
 
-    electronAPI?.onThemeChanged?.((newTheme) => {
+    let unlisteners = [];
+
+    api.onThemeChanged?.((newTheme) => {
       document.documentElement.setAttribute('data-theme', newTheme);
-    });
+    }).then(fn => { if (fn) unlisteners.push(fn); });
 
     // Listen for pomodoro state changes
-    electronAPI?.onPomodoroStateChanged?.((state) => {
+    api.onPomodoroStateChanged?.((state) => {
       setPomodoroState(state);
-    });
+    }).then(fn => { if (fn) unlisteners.push(fn); });
 
     // Check initial maximized state
     checkMaximizedState();
+
+    return () => {
+      unlisteners.forEach(fn => fn());
+    };
   }, []);
 
   const checkMaximizedState = async () => {
     try {
-      const maximized = await electronAPI?.isWindowMaximized?.();
+      const maximized = await api.isWindowMaximized?.();
       setIsMaximized(maximized);
     } catch (e) { /* ignore */ }
   };
 
   const handleClose = () => {
-    electronAPI?.closeWindow();
+    api.closeWindow();
   };
 
   const handleMinimize = () => {
-    electronAPI?.minimizeWindow();
+    api.minimizeWindow();
   };
 
   const handleMaximize = async () => {
-    await electronAPI?.maximizeWindow?.();
+    await api.maximizeWindow?.();
     // Toggle the state
     setIsMaximized(!isMaximized);
   };
@@ -83,8 +89,15 @@ export default function TrayView() {
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Title Bar - Draggable, matching TodoWindow style */}
-      <div className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100">
-        <div className="flex items-center gap-2">
+      <div
+        className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget || e.target.closest('[data-drag-area]')) {
+            api.startDragging?.();
+          }
+        }}
+      >
+        <div data-drag-area className="flex items-center gap-2">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-sky-500">
             <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="2" />
             <path d="M8 12l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -165,9 +178,13 @@ export default function TrayView() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">
-        {activeTab === 'archive' && <ArchiveViewer />}
-        {activeTab === 'analysis' && <WorkAnalysis />}
+      <div className="flex-1 overflow-auto">
+        <div className={activeTab === 'archive' ? '' : 'hidden'}>
+          <ArchiveViewer />
+        </div>
+        <div className={activeTab === 'analysis' ? '' : 'hidden'}>
+          <WorkAnalysis />
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
-const { electronAPI } = window;
+import api from '../api';
 
 export default function ArchiveViewer() {
   const [archives, setArchives] = useState([]);
@@ -72,10 +72,15 @@ export default function ArchiveViewer() {
 
   // Auto-refresh when data changes (archive or categorize)
   useEffect(() => {
-    electronAPI?.onDataChanged?.(() => {
+    let unlisten;
+    api.onDataChanged?.(() => {
       loadArchives();
       loadCategories();
-    });
+    }).then(fn => { if (fn) unlisten = fn; });
+
+    return () => {
+      if (unlisten) unlisten();
+    };
   }, []);
 
   // Cmd/Ctrl+F to focus search input (only active when this tab is mounted)
@@ -93,7 +98,7 @@ export default function ArchiveViewer() {
   const loadArchives = async () => {
     setIsLoading(true);
     try {
-      const data = await electronAPI.getArchived(filters);
+      const data = await api.getArchived(filters);
       setArchives(data);
     } catch (error) {
       console.error('Failed to load archives:', error);
@@ -104,7 +109,7 @@ export default function ArchiveViewer() {
 
   const loadCategories = async () => {
     try {
-      const data = await electronAPI.getCategories();
+      const data = await api.getCategories();
       setCategories(data);
     } catch (error) {
       console.error('Failed to load categories:', error);
@@ -146,7 +151,7 @@ export default function ArchiveViewer() {
 
   const handleSaveNote = async (id) => {
     try {
-      await electronAPI.updateNote(id, noteText);
+      await api.updateNote(id, noteText);
       setEditingNote(null);
       setNoteText('');
       await loadArchives();
@@ -187,9 +192,9 @@ export default function ArchiveViewer() {
   const handleCategorize = async (item) => {
     setCategorizingId(item.id);
     try {
-      const category = await electronAPI.categorize(item.text);
+      const category = await api.categorize(item.text);
       if (category) {
-        await electronAPI.updateCategory(item.id, category);
+        await api.updateCategory(item.id, category);
         await loadArchives();
         await loadCategories();
       }
@@ -202,10 +207,10 @@ export default function ArchiveViewer() {
 
   const handleDelete = async (id) => {
     try {
-      await electronAPI.deleteTodo(id);
+      await api.deleteTodo(id);
       await loadArchives();
       await loadCategories();
-      showUndoToast('已删除', () => electronAPI.recoverTodo(id));
+      showUndoToast('已删除', () => api.recoverTodo(id));
     } catch (error) {
       console.error('Failed to delete:', error);
     }
@@ -213,7 +218,7 @@ export default function ArchiveViewer() {
 
   const handleRestore = async (id) => {
     try {
-      await electronAPI.restoreTodo(id);
+      await api.restoreTodo(id);
       await loadArchives();
       await loadCategories();
     } catch (error) {
@@ -224,7 +229,7 @@ export default function ArchiveViewer() {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const result = await electronAPI.exportCsv({
+      const result = await api.exportCsv({
         ...filters,
         exportType,
       });
@@ -407,7 +412,7 @@ export default function ArchiveViewer() {
             <button
               onClick={async () => {
                 for (const id of [...selectedIds]) {
-                  try { await electronAPI.restoreTodo(id); } catch (e) {}
+                  try { await api.restoreTodo(id); } catch (e) {}
                 }
                 setSelectedIds(new Set());
                 await loadArchives();
@@ -422,13 +427,13 @@ export default function ArchiveViewer() {
               onClick={async () => {
                 const ids = [...selectedIds];
                 for (const id of ids) {
-                  try { await electronAPI.deleteTodo(id); } catch (e) {}
+                  try { await api.deleteTodo(id); } catch (e) {}
                 }
                 setSelectedIds(new Set());
                 await loadArchives();
                 await loadCategories();
                 showUndoToast(`已删除 ${ids.length} 项`, async () => {
-                  for (const id of ids) await electronAPI.recoverTodo(id);
+                  for (const id of ids) await api.recoverTodo(id);
                   await loadArchives();
                   await loadCategories();
                 });

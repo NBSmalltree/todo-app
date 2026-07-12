@@ -146,12 +146,13 @@ input, textarea {
 
 /* Window drag region */
 .drag-region {
-  -webkit-app-region: drag;
+  user-select: none;
 }
 
 .drag-region button,
-.drag-region input {
-  -webkit-app-region: no-drag;
+.drag-region input,
+.drag-region select {
+  cursor: default;
 }
 
 /* Scale transition */

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import DueDatePicker from './DueDatePicker';
 import PomodoroPanel from './PomodoroPanel';
 
-const { electronAPI } = window;
+import api from '../api';
 
 export default function TodoWindow() {
   const [todos, setTodos] = useState([]);
@@ -67,7 +67,7 @@ export default function TodoWindow() {
   useEffect(() => {
     const loadAppearance = async () => {
       try {
-        const data = await electronAPI.getSettings();
+        const data = await api.getSettings();
         if (data.theme && ['light', 'dark', 'eye-care'].includes(data.theme)) {
           document.documentElement.setAttribute('data-theme', data.theme);
         }
@@ -84,19 +84,25 @@ export default function TodoWindow() {
     };
     loadAppearance();
 
-    electronAPI?.onThemeChanged?.((newTheme) => {
+    let unlisteners = [];
+
+    api.onThemeChanged?.((newTheme) => {
       document.documentElement.setAttribute('data-theme', newTheme);
-    });
+    }).then(fn => { if (fn) unlisteners.push(fn); });
 
     // Auto-refresh when data changes from archive window
-    electronAPI?.onDataChanged?.(() => {
+    api.onDataChanged?.(() => {
       loadTodos();
-    });
+    }).then(fn => { if (fn) unlisteners.push(fn); });
 
     // Listen for opacity changes from settings
-    electronAPI?.onOpacityChanged?.((v) => {
+    api.onOpacityChanged?.((v) => {
       setOpacity(v);
-    });
+    }).then(fn => { if (fn) unlisteners.push(fn); });
+
+    return () => {
+      unlisteners.forEach(fn => fn());
+    };
   }, []);
 
   // Focus edit input when editing starts (more reliable than autoFocus)
@@ -120,7 +126,7 @@ export default function TodoWindow() {
         const newScale = Math.max(0.3, Math.min(2.5, scaleRef.current + delta));
         scaleRef.current = newScale;
         setScale(newScale);
-        electronAPI?.adjustScale(newScale);
+        api.adjustScale(newScale);
       }
     };
 
@@ -163,8 +169,8 @@ export default function TodoWindow() {
   const loadTodos = async () => {
     try {
       const [data, futureData] = await Promise.all([
-        electronAPI.getActiveTodos(),
-        electronAPI.getFutureScheduledTodos(),
+        api.getActiveTodos(),
+        api.getFutureScheduledTodos(),
       ]);
       setTodos(data);
       setFutureTodos(futureData);
@@ -176,7 +182,7 @@ export default function TodoWindow() {
   const handleAddTodo = async () => {
     if (!inputText.trim()) return;
     try {
-      const result = await electronAPI.addTodo(inputText.trim());
+      const result = await api.addTodo(inputText.trim());
       setInputText('');
       await loadTodos();
       // Mark the new item for enter animation
@@ -207,7 +213,7 @@ export default function TodoWindow() {
           return next;
         });
       }, 300);
-      await electronAPI.toggleTodo(id);
+      await api.toggleTodo(id);
       await loadTodos();
     } catch (error) {
       console.error('Failed to toggle todo:', error);
@@ -224,7 +230,7 @@ export default function TodoWindow() {
           return next;
         });
       }, 300);
-      await electronAPI.restoreTodo(id);
+      await api.restoreTodo(id);
       await loadTodos();
     } catch (error) {
       console.error('Failed to restore todo:', error);
@@ -236,14 +242,14 @@ export default function TodoWindow() {
       // Play exit animation first
       setExitingIds((prev) => new Set(prev).add(id));
       await new Promise((r) => setTimeout(r, 200));
-      await electronAPI.deleteTodo(id);
+      await api.deleteTodo(id);
       setExitingIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
       await loadTodos();
-      showUndoToast('已删除', () => electronAPI.recoverTodo(id));
+      showUndoToast('已删除', () => api.recoverTodo(id));
     } catch (error) {
       console.error('Failed to delete todo:', error);
     }
@@ -251,9 +257,9 @@ export default function TodoWindow() {
 
   const handleArchive = async (id) => {
     try {
-      await electronAPI.archiveTodo(id);
+      await api.archiveTodo(id);
       await loadTodos();
-      showUndoToast('已归档', () => electronAPI.restoreTodo(id));
+      showUndoToast('已归档', () => api.restoreTodo(id));
     } catch (error) {
       console.error('Failed to archive todo:', error);
     }
@@ -323,7 +329,7 @@ export default function TodoWindow() {
     // Persist new order
     const orders = reordered.map((t, i) => ({ id: t.id, sort_order: i }));
     try {
-      await electronAPI.reorder(orders);
+      await api.reorder(orders);
       await loadTodos();
     } catch (err) {
       console.error('Failed to reorder:', err);
@@ -348,7 +354,7 @@ export default function TodoWindow() {
 
   const handleColorChange = async (id, color) => {
     try {
-      await electronAPI.updateColor(id, color);
+      await api.updateColor(id, color);
       await loadTodos();
     } catch (error) {
       console.error('Failed to update color:', error);
@@ -370,7 +376,7 @@ export default function TodoWindow() {
       return;
     }
     try {
-      await electronAPI.updateText(id, trimmed);
+      await api.updateText(id, trimmed);
       setEditingId(null);
       setEditText('');
       await loadTodos();
@@ -386,7 +392,7 @@ export default function TodoWindow() {
 
   const handleChangeDueDate = async (id, dueDate) => {
     try {
-      await electronAPI.setDueDate(id, dueDate);
+      await api.setDueDate(id, dueDate);
       // 实时保存后刷新列表，但不关闭选择器（用户可能还要继续微调）
       await loadTodos();
     } catch (error) {
@@ -401,7 +407,7 @@ export default function TodoWindow() {
   // Scheduled date handlers
   const handleSetScheduledDate = async (id, dateStr) => {
     try {
-      await electronAPI.setScheduledDate(id, dateStr || null);
+      await api.setScheduledDate(id, dateStr || null);
       setScheduledPickerId(null);
       await loadTodos();
     } catch (error) {
@@ -413,7 +419,7 @@ export default function TodoWindow() {
 
   const loadSubtasks = async (todoId) => {
     try {
-      const subs = await electronAPI.getSubtasks(todoId);
+      const subs = await api.getSubtasks(todoId);
       setSubtaskData((prev) => ({ ...prev, [todoId]: subs }));
     } catch { /* ignore */ }
   };
@@ -432,18 +438,18 @@ export default function TodoWindow() {
   const handleAddSubtask = async (todoId) => {
     const text = (newSubtaskText[todoId] || '').trim();
     if (!text) return;
-    await electronAPI.addSubtask(todoId, text);
+    await api.addSubtask(todoId, text);
     setNewSubtaskText((prev) => ({ ...prev, [todoId]: '' }));
     await loadSubtasks(todoId);
   };
 
   const handleToggleSubtask = async (id, todoId) => {
-    await electronAPI.toggleSubtask(id);
+    await api.toggleSubtask(id);
     await loadSubtasks(todoId);
   };
 
   const handleDeleteSubtask = async (id, todoId) => {
-    await electronAPI.deleteSubtask(id);
+    await api.deleteSubtask(id);
     await loadSubtasks(todoId);
   };
 
@@ -473,11 +479,11 @@ export default function TodoWindow() {
 
   // Window control buttons
   const handleClose = () => {
-    electronAPI?.closeWindow();
+    api.closeWindow();
   };
 
   const handleOpenTray = () => {
-    electronAPI?.openTrayWindow();
+    api.openTrayWindow();
   };
 
   // Corner resize handlers
@@ -504,7 +510,7 @@ export default function TodoWindow() {
       const newScale = Math.max(0.3, Math.min(2.5, resizeStart.scale + scaleDelta));
       scaleRef.current = newScale;
       setScale(newScale);
-      electronAPI?.adjustScale(newScale);
+      api.adjustScale(newScale);
     };
 
     const handleMouseUp = () => {
@@ -562,8 +568,15 @@ export default function TodoWindow() {
     <div className="h-full overflow-hidden" style={{ opacity }}>
       <div className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 relative">
       {/* Title Bar - Draggable */}
-      <div className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100">
-        <div className="flex items-center gap-2">
+      <div
+        className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget || e.target.closest('[data-drag-area]')) {
+            api.startDragging?.();
+          }
+        }}
+      >
+        <div data-drag-area className="flex items-center gap-2">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-sky-500">
             <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="2" />
             <path d="M8 12l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -737,12 +750,12 @@ export default function TodoWindow() {
               onClick={async () => {
                 const ids = [...selectedIds];
                 for (const id of ids) {
-                  try { await electronAPI.deleteTodo(id); } catch (e) {}
+                  try { await api.deleteTodo(id); } catch (e) {}
                 }
                 setSelectedIds(new Set());
                 await loadTodos();
                 showUndoToast(`已删除 ${ids.length} 项`, async () => {
-                  for (const id of ids) await electronAPI.recoverTodo(id);
+                  for (const id of ids) await api.recoverTodo(id);
                   await loadTodos();
                 });
               }}
@@ -756,7 +769,7 @@ export default function TodoWindow() {
                 for (const id of [...selectedIds]) {
                   const todo = todos.find(t => t.id === id);
                   if (todo && todo.completed) {
-                    try { await electronAPI.archiveTodo(id); } catch (e) {}
+                    try { await api.archiveTodo(id); } catch (e) {}
                   }
                 }
                 setSelectedIds(new Set());
