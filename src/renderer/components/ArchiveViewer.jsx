@@ -2,6 +2,66 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 import api from '../api';
 
+// Custom select dropdown with polished styling
+function CustomSelect({ value, onChange, options, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selected = options.find((o) => o.value === value);
+  const label = selected ? selected.label : placeholder || '请选择';
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-sm bg-white rounded-lg border transition-all ${
+          open
+            ? 'border-sky-400 ring-2 ring-sky-100'
+            : 'border-gray-200 hover:border-gray-300'
+        }`}
+      >
+        <span className={value === (options[0]?.value) ? 'text-gray-400' : 'text-gray-700'}>
+          {label}
+        </span>
+        <svg
+          className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+        >
+          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-full min-w-[140px] bg-white rounded-lg shadow-lg border border-gray-200 py-1 max-h-48 overflow-auto">
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                opt.value === value
+                  ? 'bg-sky-50 text-sky-600 font-medium'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ArchiveViewer() {
   const [archives, setArchives] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -308,18 +368,14 @@ export default function ArchiveViewer() {
           {/* Category Filter */}
           <div className="min-w-[140px]">
             <label className="block text-xs text-gray-500 mb-1">类别</label>
-            <select
+            <CustomSelect
               value={filters.category}
-              onChange={(e) => handleFilterChange('category', e.target.value)}
-              className="w-full px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
-            >
-              <option value="all">全部类别</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => handleFilterChange('category', val)}
+              options={[
+                { value: 'all', label: '全部类别' },
+                ...categories.map((cat) => ({ value: cat, label: cat })),
+              ]}
+            />
           </div>
 
           {/* Date Range */}
@@ -368,15 +424,15 @@ export default function ArchiveViewer() {
 
           {/* Export */}
           <div className="flex items-center gap-2 ml-auto">
-            <select
+            <CustomSelect
               value={exportType}
-              onChange={(e) => setExportType(e.target.value)}
-              className="px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
-            >
-              <option value="archived">归档任务</option>
-              <option value="active">待办任务</option>
-              <option value="all">全部任务</option>
-            </select>
+              onChange={(val) => setExportType(val)}
+              options={[
+                { value: 'archived', label: '归档任务' },
+                { value: 'active', label: '待办任务' },
+                { value: 'all', label: '全部任务' },
+              ]}
+            />
             <button
               onClick={handleExport}
               disabled={isExporting}
