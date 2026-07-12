@@ -47,6 +47,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'TodoFloat v__VERSION__'
+          releaseDraft: false
+          prerelease: false
           args: --target ${{ matrix.target }}
 
   build-windows:
@@ -75,3 +79,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'TodoFloat v__VERSION__'
+          releaseDraft: false
+          prerelease: false
