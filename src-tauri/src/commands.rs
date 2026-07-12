@@ -522,7 +522,6 @@ pub fn window_apply_theme(app: tauri::AppHandle, theme: String) -> Result<(), St
 #[tauri::command]
 pub fn open_tray_window(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("tray-view") {
-        let _ = set_win_level_above(&window);
         let _ = window.show();
         let _ = window.set_focus();
         let _ = app.emit_to("tray-view", "navigate", "/tray");
@@ -533,44 +532,10 @@ pub fn open_tray_window(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("settings") {
-        let _ = set_win_level_above(&window);
         let _ = window.show();
         let _ = window.set_focus();
     }
     Ok(())
-}
-
-fn set_win_level_above(window: &tauri::WebviewWindow) -> Result<(), String> {
-    use objc2::msg_send;
-    use raw_window_handle::HasWindowHandle;
-    if let Ok(wh) = window.window_handle() {
-        if let raw_window_handle::RawWindowHandle::AppKit(handle) = wh.as_raw() {
-            let ns_view = handle.ns_view.as_ptr() as *mut objc2::runtime::AnyObject;
-            unsafe {
-                let ns_window: *mut objc2::runtime::AnyObject = msg_send![ns_view, window];
-                if !ns_window.is_null() {
-                    let _: () = msg_send![ns_window, setLevel: 8i32];
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-pub fn reset_window_level(window: &tauri::WebviewWindow) {
-    use objc2::msg_send;
-    use raw_window_handle::HasWindowHandle;
-    if let Ok(wh) = window.window_handle() {
-        if let raw_window_handle::RawWindowHandle::AppKit(handle) = wh.as_raw() {
-            let ns_view = handle.ns_view.as_ptr() as *mut objc2::runtime::AnyObject;
-            unsafe {
-                let ns_window: *mut objc2::runtime::AnyObject = msg_send![ns_view, window];
-                if !ns_window.is_null() {
-                    let _: () = msg_send![ns_window, setLevel: 0i32];
-                }
-            }
-        }
-    }
 }
 
 // ===== App - Backup/Restore =====

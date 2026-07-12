@@ -182,11 +182,6 @@ pub fn run() {
                 if label == "float" || label == "quickadd" || label == "tray-view" || label == "settings" {
                     api.prevent_close();
                     let _ = window.hide();
-                    if label == "tray-view" || label == "settings" {
-                        if let Some(w) = window.app_handle().get_webview_window(&label) {
-                            crate::commands::reset_window_level(&w);
-                        }
-                    }
                 }
                 if label == "float" {
                     let app_handle = window.app_handle();
