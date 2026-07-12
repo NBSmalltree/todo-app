@@ -55,19 +55,23 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
-            // Enable mouse events on float window even when not focused
+            // Make windows draggable from background (title bar area).
+            // Webview interactive elements (buttons, inputs) still capture
+            // clicks first, so dragging only starts on empty/non-interactive areas.
             #[cfg(target_os = "macos")]
             {
                 use objc2::msg_send;
-                if let Some(window) = app.get_webview_window("float") {
-                    use raw_window_handle::HasWindowHandle;
-                    if let Ok(wh) = window.window_handle() {
-                        if let raw_window_handle::RawWindowHandle::AppKit(handle) = wh.as_raw() {
-                            let ns_view = handle.ns_view.as_ptr() as *mut objc2::runtime::AnyObject;
-                            unsafe {
-                                let ns_window: *mut objc2::runtime::AnyObject = msg_send![ns_view, window];
-                                if !ns_window.is_null() {
-                                    let _: () = msg_send![ns_window, setAcceptsMouseMovedEvents: true];
+                for label in &["float", "tray-view", "settings", "quickadd"] {
+                    if let Some(window) = app.get_webview_window(label) {
+                        use raw_window_handle::HasWindowHandle;
+                        if let Ok(wh) = window.window_handle() {
+                            if let raw_window_handle::RawWindowHandle::AppKit(handle) = wh.as_raw() {
+                                let ns_view = handle.ns_view.as_ptr() as *mut objc2::runtime::AnyObject;
+                                unsafe {
+                                    let ns_window: *mut objc2::runtime::AnyObject = msg_send![ns_view, window];
+                                    if !ns_window.is_null() {
+                                        let _: () = msg_send![ns_window, setMovableByWindowBackground: true];
+                                    }
                                 }
                             }
                         }
