@@ -4,6 +4,7 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/NBSmalltree/todo-app/.github/workflows/build.yml?style=flat-square&logo=githubactions)](https://github.com/NBSmalltree/todo-app/actions)
 [![License](https://img.shields.io/github/license/NBSmalltree/todo-app?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-blue?style=flat-square)](https://github.com/NBSmalltree/todo-app/releases)
+[![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-orange?style=flat-square&logo=tauri)](https://tauri.app)
 
 > 一款轻量级桌面待办清单应用，**始终悬浮在所有窗口之上**。支持任务管理、AI 智能分类、工作分析与番茄钟专注，帮你高效管理每一天。
 
@@ -75,10 +76,11 @@
 
 ### 🔗 系统集成
 - **系统托盘** — 右键菜单直达待办清单、历史归档、设置
+- **菜单栏应用（macOS）** — 隐藏 Dock 图标，仅通过系统托盘运行，不占用任务栏
 - **全局快捷键** — `Cmd/Ctrl + Shift + T` 显示 / 隐藏、`Cmd/Ctrl + Shift + Space` 快速添加（均支持自定义）
 - **定时提醒** — 可配置提前时间（0~1440 分钟），系统通知提醒即将到期的任务，自动去重
 - **跨平台** — 支持 macOS（Intel + Apple Silicon）和 Windows
-- **CI/CD** — GitHub Actions 自动构建 macOS (.dmg) 和 Windows (.exe)
+- **CI/CD** — GitHub Actions 自动构建 macOS (.dmg) 和 Windows (.msi / .exe)
 
 ### 🤖 AI 集成
 - 支持 OpenAI API 兼容协议 + Anthropic 协议
@@ -102,11 +104,12 @@
 ## 🚀 快速开始
 
 ### 环境要求
-- **Node.js** 18+
+- **Node.js** 20+
 - **npm**
-- C++ 编译工具（编译 `better-sqlite3` 原生模块）
-  - **macOS**：`xcode-select --install`
-  - **Windows**：Visual Studio Build Tools
+- **Rust** 稳定版工具链（[安装指引](https://www.rust-lang.org/tools/install)）
+- 系统依赖
+  - **macOS**：`xcode-select --install`（Xcode Command Line Tools）
+  - **Windows**：[Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)（Rust MSVC 链接需要）
 
 ### 安装与运行
 
@@ -114,10 +117,10 @@
 git clone https://github.com/NBSmalltree/todo-app.git
 cd todo-app
 npm install
-npm run dev
+npm run tauri dev
 ```
 
-`npm install` 会自动编译 `better-sqlite3` 原生模块。`npm run dev` 同时启动 Vite 开发服务器和 Electron，支持热重载。
+`npm install` 安装前端依赖；`npm run tauri dev` 会自动启动 Vite 开发服务器并加载 Tauri 原生窗口，支持前端热重载。
 
 ### 构建安装包
 
@@ -125,30 +128,33 @@ npm run dev
 npm run build    # 构建当前平台安装包
 ```
 
-构建产物输出到 `dist-electron/` 目录。
+构建产物输出到 `src-tauri/target/<目标平台>/release/bundle/` 目录（macOS 为 `.dmg` / `.app`，Windows 为 `.msi` / `.exe`）。
 
 ---
 
 ## 📦 下载安装
 
-### 当前版本：v1.4.1
+### 当前版本：v2.0.1
 
 > [查看所有版本](https://github.com/NBSmalltree/todo-app/releases)
 
 | 平台 | 架构 | 下载文件 |
 |------|------|----------|
-| macOS | Apple Silicon | `TodoFloat-1.4.1-arm64.dmg` |
-| macOS | Intel | `TodoFloat-1.4.1-x64.dmg` |
-| Windows | x64 | `TodoFloat-1.4.1.exe` |
+| macOS | Apple Silicon | `TodoFloat_2.0.1_aarch64.dmg` |
+| macOS | Intel | `TodoFloat_2.0.1_x64.dmg` |
+| Windows | x64 (MSI) | `TodoFloat_2.0.1_x64_en-US.msi` |
+| Windows | x64 (NSIS) | `TodoFloat_2.0.1_x64-setup.exe` |
 
 ### 发布新版本
 
+推送 `v*` 格式的标签即可触发 GitHub Actions 自动构建并发布 Release：
+
 ```bash
-npm run release            # 使用 package.json 当前版本
-npm run release -- 1.2.3   # 指定新版本号
+git tag -a v2.0.2 -m "Release v2.0.2"
+git push origin v2.0.2
 ```
 
-自动执行：更新版本号 → 提交 → 推送 → 打 tag → 触发 GitHub Actions 构建。
+> ⚠️ 发布前需同步更新三处版本号：`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`（以及 `Cargo.lock`）。脚本 `scripts/release.sh` 目前仅更新 `package.json`，Tauri 迁移后建议手动确认三处版本一致。
 
 ---
 
@@ -208,10 +214,10 @@ npm run release -- 1.2.3   # 指定新版本号
 | 类别 | 技术 |
 |------|------|
 | 前端框架 | React 18 |
-| 桌面框架 | Electron 33 |
-| 构建工具 | Vite 6 + electron-builder |
+| 桌面框架 | Tauri 2（Rust 后端） |
+| 构建工具 | Vite 6 + Tauri |
 | 样式方案 | Tailwind CSS 3 + PostCSS |
-| 数据库 | SQLite（better-sqlite3），含版本化迁移系统 |
+| 数据库 | SQLite（rusqlite，bundled），含版本化迁移系统 |
 | AI 集成 | OpenAI SDK + Anthropic SDK |
 | 图表 | Recharts |
 | Markdown | react-markdown |
@@ -226,13 +232,9 @@ npm run release -- 1.2.3   # 指定新版本号
 ```
 todo-app/
 ├── src/
-│   ├── main/                  # Electron 主进程
-│   │   ├── main.js            # 窗口管理、IPC、托盘、快捷键、提醒、番茄钟
-│   │   ├── database.js        # SQLite 数据库（CRUD、设置、迁移、备份恢复）
-│   │   ├── llm.js             # LLM 集成（分类、工作分析）
-│   │   └── preload.js         # 预加载脚本（IPC 桥接）
 │   └── renderer/              # React 前端
 │       ├── App.jsx            # 路由（/ 待办 /tray 归档 /settings 设置 /quickadd 快速添加）
+│       ├── api.js             # Tauri IPC 调用封装
 │       ├── components/
 │       │   ├── TodoWindow.jsx        # 悬浮待办窗口
 │       │   ├── TrayView.jsx          # 归档视图
@@ -240,35 +242,52 @@ todo-app/
 │       │   ├── WorkAnalysis.jsx      # 工作分析（图表、AI 建议、番茄钟统计）
 │       │   ├── Settings.jsx          # 设置页面
 │       │   ├── PomodoroPanel.jsx     # 番茄钟面板
-│       │   ├── QuickAdd.jsx           # 快速添加窗口
+│       │   ├── QuickAdd.jsx          # 快速添加窗口
 │       │   └── DueDatePicker.jsx     # 日期时间选择器
 │       └── styles/
-│           └── index.css             # 全局样式、主题变量、动画
+│           └── index.css            # 全局样式、主题变量、动画
+├── src-tauri/                # Tauri（Rust）后端
+│   ├── src/
+│   │   ├── main.rs            # 程序入口
+│   │   ├── lib.rs             # 应用构建、窗口、托盘、快捷键、macOS 集成
+│   │   ├── database.rs        # SQLite（CRUD、设置、迁移、备份恢复）
+│   │   ├── commands.rs        # Tauri 命令（IPC 暴露给前端）
+│   │   ├── llm.rs             # LLM 集成（分类、工作分析）
+│   │   └── pomodoro.rs        # 番茄钟状态机
+│   ├── icons/                 # 应用图标（icns / ico / png）
+│   ├── Cargo.toml             # Rust 依赖与版本
+│   └── tauri.conf.json        # Tauri 配置（窗口、权限、打包）
 ├── assets/
-│   ├── icon.png                # 应用图标
-│   └── tray-icon.png           # 系统托盘图标
+│   ├── icon.png               # 应用图标源文件
+│   └── tray-icon.png          # 系统托盘图标
 ├── scripts/
-│   └── release.sh              # 发布脚本
+│   └── release.sh             # 发布辅助脚本
 ├── .github/workflows/
-│   └── build.yml               # CI/CD 构建流水线
+│   └── build.yml              # CI/CD 构建流水线
 └── package.json
 ```
 
 ### 开发命令
 
 ```bash
-npm run dev              # 启动开发模式（Vite + Electron，热重载）
-npm run build            # 构建当前平台安装包
-npm run build:renderer   # 只构建前端
-npm run release          # 发布（使用当前版本号）
-npm run release -- x.x.x # 发布（指定新版本号）
+npm run tauri dev        # 启动开发模式（自动启动 Vite + Tauri 原生窗口，热重载）
+npm run dev              # 仅启动 Vite 前端（浏览器预览，无原生窗口）
+npm run build            # 构建当前平台安装包（tauri build）
+npm run build:renderer   # 仅构建前端（vite build）
 ```
 
 ### 发布流程
 
+推送 `v*` 标签即触发 CI 构建，构建完成后自动创建 GitHub Release 并上传安装包：
+
 ```bash
-npm run release              # 自动更新版本 → 提交 → 打 tag → 推送 → 触发 CI
-npm run release -- 1.1.0     # 指定版本号
+# 1. 同步更新三处版本号（package.json / tauri.conf.json / Cargo.toml）
+# 2. 提交并推送
+git commit -am "release: v2.0.2"
+git push
+# 3. 打标签并推送，触发 GitHub Actions
+git tag -a v2.0.2 -m "Release v2.0.2"
+git push origin v2.0.2
 ```
 
 构建完成后在 [GitHub Releases](https://github.com/NBSmalltree/todo-app/releases) 下载安装包。
@@ -281,10 +300,12 @@ npm run release -- 1.1.0     # 指定版本号
 
 | 平台 | 路径 |
 |------|------|
-| macOS | `~/Library/Application Support/todo-float/` |
-| Windows | `%APPDATA%/todo-float/` |
+| macOS | `~/Library/Application Support/com.todofloat.app/` |
+| Windows | `%APPDATA%/com.todofloat.app/` |
 
-数据库中存储所有设置（主题、透明度、AI 配置、快捷键、提醒、番茄钟等）和任务数据。
+数据库文件为 `todofloat.db`，存储所有设置（主题、透明度、AI 配置、快捷键、提醒、番茄钟等）和任务数据。
+
+> 💡 从 v1.x（Electron 版）升级时，应用会自动从旧目录 `todo-float/` 迁移数据库到新的 `com.todofloat.app/` 目录，无需手动操作。
 
 ### 备份与恢复
 
@@ -297,16 +318,26 @@ npm run release -- 1.1.0     # 指定版本号
 
 ## ❓ 常见问题
 
-### 1. 依赖安装失败
+### 1. 依赖安装 / 编译失败
 
+前端依赖：
 ```bash
 rm -rf node_modules package-lock.json
 npm install
 ```
 
+Rust 后端编译失败时，确认已安装 Rust 工具链并更新到最新稳定版：
+```bash
+rustup update stable
+```
+
+macOS 需 Xcode Command Line Tools（`xcode-select --install`），Windows 需 Microsoft C++ Build Tools。
+
 ### 2. 窗口关闭后打不开
 
 窗口关闭后应用仍在系统托盘运行。右键点击系统托盘图标（Windows 可能在「^」展开区域），选择「待办清单」重新打开。如仍无法打开，删除数据库文件后重启。
+
+> 注：macOS 上应用以菜单栏方式运行，Dock 中不显示图标，仅通过系统托盘交互。
 
 ### 3. macOS 提示"来自身份不明的开发者"
 
