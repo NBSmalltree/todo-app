@@ -25,10 +25,12 @@ pub fn run() {
                     if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                         let state = app.state::<AppState>();
                         let settings = state.db.lock().unwrap().get_settings_map().unwrap_or_default();
+                        let default_toggle = if cfg!(target_os = "macos") { "Cmd+Shift+T" } else { "Ctrl+Shift+T" };
+                        let default_quickadd = if cfg!(target_os = "macos") { "Cmd+Shift+Space" } else { "Ctrl+Shift+Space" };
                         let toggle_str = settings.get("shortcut_toggle")
-                            .and_then(|v| v.as_str()).unwrap_or("Cmd+Shift+T");
+                            .and_then(|v| v.as_str()).unwrap_or(default_toggle);
                         let quickadd_str = settings.get("shortcut_quickadd")
-                            .and_then(|v| v.as_str()).unwrap_or("Cmd+Shift+Space");
+                            .and_then(|v| v.as_str()).unwrap_or(default_quickadd);
                         
                         let matches_toggle = toggle_str.parse::<tauri_plugin_global_shortcut::Shortcut>()
                             .map(|sc| &sc == shortcut).unwrap_or(false);

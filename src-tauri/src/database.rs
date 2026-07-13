@@ -76,29 +76,34 @@ impl Database {
         std::fs::create_dir_all(&app_data)?;
         let db_path = app_data.join("todofloat.db");
 
-        // Migrate from old Electron location if needed
-        if !db_path.exists() {
-            let old_path = if cfg!(target_os = "macos") {
-                std::env::var("HOME").ok().map(|home| {
-                    std::path::PathBuf::from(home)
-                        .join("Library/Application Support/todo-float/todofloat.db")
-                })
-            } else if cfg!(target_os = "windows") {
-                std::env::var("APPDATA").ok().map(|appdata| {
-                    std::path::PathBuf::from(appdata)
-                        .join("todo-float/todofloat.db")
-                })
+        // Migrate from old Electron location if the new db is missing or empty.
+        // A previous Tauri install may have already created an empty db, which
+        // would block migration — so we also check whether the new db has any
+        // todos before deciding to copy the old one.
+        let old_db_path = find_old_electron_db();
+        let need_migrate = if !db_path.exists() {
+            true
+        } else if old_db_path.is_some() {
+            // Open a throwaway connection to check if the new db is empty.
+            if let Ok(conn) = Connection::open(&db_path) {
+                let count: i64 = conn
+                    .query_row("SELECT COUNT(*) FROM todos", [], |row| row.get(0))
+                    .unwrap_or(0);
+                count == 0
             } else {
-                // Linux
-                std::env::var("HOME").ok().map(|home| {
-                    std::path::PathBuf::from(home)
-                        .join(".config/todo-float/todofloat.db")
-                })
-            };
+                false
+            }
+        } else {
+            false
+        };
 
-            if let Some(old_path) = old_path {
+        if need_migrate {
+            if let Some(ref old_path) = old_db_path {
                 if old_path.exists() {
-                    let _ = std::fs::copy(&old_path, &db_path);
+                    match std::fs::copy(old_path, &db_path) {
+                        Ok(_) => println!("[DB] Migrated database from {}", old_path.display()),
+                        Err(e) => eprintln!("[DB] Migration copy failed: {}", e),
+                    }
                     // Also copy WAL/SHM files if they exist
                     let old_wal = old_path.with_extension("db-wal");
                     if old_wal.exists() {
@@ -783,4 +788,47 @@ impl Database {
         })?.filter_map(|r| r.ok()).collect();
         Ok(todos)
     }
+}
+
+/// Locate the old Electron app's database file for migration.
+///
+/// The packaged Electron app used `app.getPath('userData')`, which resolves to
+/// `%APPDATA%\TodoFloat` (productName) on Windows and `~/Library/Application Support/TodoFloat`
+/// on macOS. The dev build used the `name` field ("todo-float") instead. We check both casings.
+fn find_old_electron_db() -> Option<PathBuf> {
+    if cfg!(target_os = "macos") {
+        if let Ok(home) = std::env::var("HOME") {
+            let base = PathBuf::from(home).join("Library/Application Support");
+            let prod = base.join("TodoFloat/todofloat.db");
+            if prod.exists() {
+                return Some(prod);
+            }
+            let dev = base.join("todo-float/todofloat.db");
+            if dev.exists() {
+                return Some(dev);
+            }
+        }
+    } else if cfg!(target_os = "windows") {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let base = PathBuf::from(appdata);
+            // Packaged Electron app (productName)
+            let prod = base.join("TodoFloat/todofloat.db");
+            if prod.exists() {
+                return Some(prod);
+            }
+            // Dev Electron app (name field)
+            let dev = base.join("todo-float/todofloat.db");
+            if dev.exists() {
+                return Some(dev);
+            }
+        }
+    } else {
+        if let Ok(home) = std::env::var("HOME") {
+            let p = PathBuf::from(home).join(".config/todo-float/todofloat.db");
+            if p.exists() {
+                return Some(p);
+            }
+        }
+    }
+    None
 }
