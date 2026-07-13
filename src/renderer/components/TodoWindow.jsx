@@ -33,6 +33,7 @@ export default function TodoWindow() {
   const [newSubtaskText, setNewSubtaskText] = useState({}); // todoId → text
   // Future scheduled tasks
   const [futureTodos, setFutureTodos] = useState([]);
+  const todosRef = useRef([]); // ref for polling loop to check without stale closure
   const [showFutureSection, setShowFutureSection] = useState(false);
   const [scheduledPickerId, setScheduledPickerId] = useState(null); // todo id being scheduled
   const [showCompleted, setShowCompleted] = useState(false); // 已完成任务折叠
@@ -58,12 +59,32 @@ export default function TodoWindow() {
     document.documentElement.style.setProperty('--app-font-family', fontFamilyValue);
   };
 
-  // Load todos on mount — retry once after a short delay in case the Tauri
+  // Load todos on mount — retry with exponential backoff in case the Tauri
   // IPC bridge isn't fully ready on the first call (common on Windows).
   useEffect(() => {
-    loadTodos();
-    const retryTimer = setTimeout(() => loadTodos(), 300);
-    return () => clearTimeout(retryTimer);
+    let cancelled = false;
+    let retryTimer = null;
+
+    const pollLoad = async (attempt) => {
+      if (cancelled) return;
+      await loadTodos();
+      if (cancelled) return;
+
+      // Stop retrying once data has been received or max attempts exhausted
+      const hasData = todosRef.current.length > 0;
+      if (!hasData && attempt < 8) {
+        // Exponential backoff: 100, 200, 400, 800, 1600, 3200, 5000, 5000
+        const delay = Math.min(100 * Math.pow(2, attempt), 5000);
+        retryTimer = setTimeout(() => pollLoad(attempt + 1), delay);
+      }
+    };
+
+    pollLoad(0);
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, []);
 
   // Load and apply theme & opacity on mount, listen for changes
@@ -176,6 +197,7 @@ export default function TodoWindow() {
     try {
       const data = await api.getActiveTodos();
       setTodos(data);
+      todosRef.current = data;
     } catch (error) {
       console.error('Failed to load active todos:', error);
     }

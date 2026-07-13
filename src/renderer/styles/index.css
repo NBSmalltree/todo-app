@@ -20,6 +20,8 @@ body {
   background: transparent;
   user-select: none;
   -webkit-user-select: none;
+  overflow: hidden;
+  border-radius: 12px;
 }
 
 input, textarea {

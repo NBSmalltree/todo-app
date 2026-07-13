@@ -23,7 +23,7 @@
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "shadow": false,
+        "shadow": true,
         "visibleOnAllWorkspaces": true,
         "center": false,
         "url": "/"

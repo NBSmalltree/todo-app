@@ -46,7 +46,7 @@ export default function QuickAdd() {
       <div className="w-full px-4">
         <div className="flex items-center gap-2 bg-white rounded-xl shadow-lg border border-gray-200 px-4 py-2.5 relative">
           <button onClick={doClose}
-            className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center rounded-full bg-white hover:bg-red-50 text-gray-300 hover:text-red-500 shadow border border-gray-200 transition-all"
+            className="absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded-full bg-white hover:bg-red-50 text-gray-300 hover:text-red-500 shadow border border-gray-200 transition-all"
             title="关闭 (Esc)"
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
