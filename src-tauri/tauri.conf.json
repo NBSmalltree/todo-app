@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedoc/tauri/refs/heads/dev/crates/tauri-config-schema/schema.json",
   "productName": "TodoFloat",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "identifier": "com.todofloat.app",
   "build": {
     "frontendDist": "../build/renderer",
@@ -34,7 +34,8 @@
         "width": 900,
         "height": 700,
         "decorations": false,
-        "transparent": false,
+        "transparent": true,
+        "shadow": true,
         "visible": false,
         "url": "/#/tray"
       },
@@ -44,7 +45,8 @@
         "width": 500,
         "height": 600,
         "decorations": false,
-        "transparent": false,
+        "transparent": true,
+        "shadow": true,
         "visible": false,
         "url": "/#/settings"
       },

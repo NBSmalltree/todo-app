@@ -87,7 +87,8 @@ export default function TrayView() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen">
+      <div className="h-full flex flex-col bg-gray-50 rounded-xl shadow-xl overflow-hidden">
       {/* Title Bar - Draggable, matching TodoWindow style */}
       <div
         className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100"
@@ -185,6 +186,7 @@ export default function TrayView() {
         <div className={activeTab === 'analysis' ? '' : 'hidden'}>
           <WorkAnalysis />
         </div>
+      </div>
       </div>
     </div>
   );

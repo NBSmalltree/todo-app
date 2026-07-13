@@ -58,9 +58,12 @@ export default function TodoWindow() {
     document.documentElement.style.setProperty('--app-font-family', fontFamilyValue);
   };
 
-  // Load todos on mount
+  // Load todos on mount — retry once after a short delay in case the Tauri
+  // IPC bridge isn't fully ready on the first call (common on Windows).
   useEffect(() => {
     loadTodos();
+    const retryTimer = setTimeout(() => loadTodos(), 300);
+    return () => clearTimeout(retryTimer);
   }, []);
 
   // Load and apply theme & opacity on mount, listen for changes
@@ -167,15 +170,20 @@ export default function TodoWindow() {
   }, []);
 
   const loadTodos = async () => {
+    // Load active todos and future todos independently so a failure in one
+    // doesn't block the other (especially important on first mount when the
+    // Tauri IPC bridge may not be fully ready on Windows).
     try {
-      const [data, futureData] = await Promise.all([
-        api.getActiveTodos(),
-        api.getFutureScheduledTodos(),
-      ]);
+      const data = await api.getActiveTodos();
       setTodos(data);
+    } catch (error) {
+      console.error('Failed to load active todos:', error);
+    }
+    try {
+      const futureData = await api.getFutureScheduledTodos();
       setFutureTodos(futureData);
     } catch (error) {
-      console.error('Failed to load todos:', error);
+      console.error('Failed to load future todos:', error);
     }
   };
 
@@ -565,7 +573,7 @@ export default function TodoWindow() {
   const completedTodos = filteredTodos.filter((t) => t.completed);
 
   return (
-    <div className="h-full overflow-hidden" style={{ opacity }}>
+    <div className="h-full" style={{ opacity }}>
       <div className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 relative">
       {/* Title Bar - Draggable */}
       <div

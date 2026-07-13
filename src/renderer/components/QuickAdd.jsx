@@ -42,7 +42,7 @@ export default function QuickAdd() {
   };
 
   return (
-    <div className="h-screen flex items-center justify-center bg-gray-50">
+    <div className="h-screen flex items-center justify-center">
       <div className="w-full px-4">
         <div className="flex items-center gap-2 bg-white rounded-xl shadow-lg border border-gray-200 px-4 py-2.5 relative">
           <button onClick={doClose}
