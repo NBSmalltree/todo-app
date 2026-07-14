@@ -60,7 +60,7 @@ export default function QuickAdd() {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit(); } }}
             placeholder="快速添加待办，回车保存，Esc 关闭"
-            className="flex-1 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400"
+            className="flex-1 text-base !bg-transparent outline-none text-gray-700 placeholder-gray-400"
           />
           {text && (
             <button onClick={() => { setText(''); inputRef.current?.focus(); }}
