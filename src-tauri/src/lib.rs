@@ -63,6 +63,34 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
+            // On Windows 11, disable DWM native rounded corners so CSS
+            // border-radius on the web content handles all rounding.
+            // This eliminates the solid-color bleed behind the CSS arcs and
+            // removes the black edge lines caused by DWM shadow/rounding mismatch.
+            #[cfg(target_os = "windows")]
+            {
+                use raw_window_handle::HasWindowHandle;
+                const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
+                const DWMWCP_DONOTROUND: u32 = 1;
+                for label in &["float", "tray-view", "settings", "quickadd"] {
+                    if let Some(window) = app.get_webview_window(label) {
+                        if let Ok(wh) = window.window_handle() {
+                            if let raw_window_handle::RawWindowHandle::Win32(handle) = wh.as_raw() {
+                                let hwnd = handle.hwnd.get() as *mut _;
+                                unsafe {
+                                    windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute(
+                                        hwnd,
+                                        DWMWA_WINDOW_CORNER_PREFERENCE,
+                                        &DWMWCP_DONOTROUND as *const u32 as *const _,
+                                        std::mem::size_of::<u32>() as u32,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Make windows draggable from background (title bar area).
             // Webview interactive elements (buttons, inputs) still capture
             // clicks first, so dragging only starts on empty/non-interactive areas.

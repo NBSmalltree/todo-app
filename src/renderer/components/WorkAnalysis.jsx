@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useI18n } from '../i18n';
 import {
@@ -36,6 +36,9 @@ export default function WorkAnalysis() {
     return () => { if (unlisten2) unlisten2(); };
   }, []);
 
+  const analysisRef = useRef(null);
+  const pomodoroRef = useRef(null);
+
   useEffect(() => {
     // Listen for data changes (archive/toggle) → mark cache stale
     let unlisten;
@@ -49,10 +52,30 @@ export default function WorkAnalysis() {
     };
   }, []);
 
-  // Load data on mount and when period/dataVersion changes
+  // Load data on mount with exponential backoff retry for Windows IPC bridge
   useEffect(() => {
-    loadAnalysis();
-    loadPomodoroStats();
+    let cancelled = false;
+    let retryTimer = null;
+
+    const pollLoad = async (attempt) => {
+      if (cancelled) return;
+      await loadAnalysis();
+      await loadPomodoroStats();
+      if (cancelled) return;
+
+      const hasData = analysisRef.current !== null && pomodoroRef.current !== null;
+      if (!hasData && attempt < 8) {
+        const delay = Math.min(100 * Math.pow(2, attempt), 5000);
+        retryTimer = setTimeout(() => pollLoad(attempt + 1), delay);
+      }
+    };
+
+    pollLoad(0);
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [period, dataVersion]);
 
   const loadAnalysis = async () => {
@@ -60,6 +83,7 @@ export default function WorkAnalysis() {
     try {
       const data = await api.getWorkAnalysis(period);
       setAnalysis(data);
+      analysisRef.current = data;
       setIsLoading(false);
 
       // Handle LLM analysis — non-blocking, runs after UI is ready
@@ -83,15 +107,12 @@ export default function WorkAnalysis() {
     try {
       const stats = await api.pomodoroGetStats(period);
       setPomodoroStats(stats);
+      pomodoroRef.current = stats;
     } catch (e) {
-      console.error('Failed to load pomodoro stats:', e);
-      setPomodoroStats({
-        totalSessions: 0,
-        totalFocusMinutes: 0,
-        todaySessions: 0,
-        dailyBreakdown: [],
-        recentSessions: [],
-      });
+      // Set empty default so the loading gate doesn't spin forever
+      const empty = { totalSessions: 0, totalFocusMinutes: 0, todaySessions: 0, dailyBreakdown: [], recentSessions: [] };
+      setPomodoroStats(empty);
+      pomodoroRef.current = empty;
     }
     setPomodoroLoading(false);
   };
