@@ -88,7 +88,7 @@ export default function TrayView() {
 
   return (
     <div className="h-screen">
-      <div className="h-full flex flex-col bg-gray-50 rounded-xl shadow-xl overflow-hidden">
+      <div className="h-full flex flex-col bg-gray-50 rounded-xl overflow-hidden">
       {/* Title Bar - Draggable, matching TodoWindow style */}
       <div
         className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100"

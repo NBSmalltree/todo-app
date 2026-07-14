@@ -223,8 +223,7 @@ input, textarea {
   color: #6c7086 !important;
 }
 
-[data-theme="dark"] .shadow-sm,
-[data-theme="dark"] .shadow-2xl {
+[data-theme="dark"] .shadow-sm {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
 }
 

@@ -35,7 +35,7 @@
         "height": 700,
         "decorations": false,
         "transparent": true,
-        "shadow": true,
+        "shadow": false,
         "visible": false,
         "url": "/#/tray"
       },
@@ -46,7 +46,7 @@
         "height": 600,
         "decorations": false,
         "transparent": true,
-        "shadow": true,
+        "shadow": false,
         "visible": false,
         "url": "/#/settings"
       },
@@ -60,7 +60,7 @@
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "shadow": true,
+        "shadow": false,
         "visible": false,
         "url": "/#/quickadd"
       }
