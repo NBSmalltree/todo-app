@@ -1,6 +1,6 @@
 {
   "name": "todo-float",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "type": "module",
   "description": "轻量级桌面待办清单 - 漂浮在所有窗口顶端 (Tauri)",
   "scripts": {
