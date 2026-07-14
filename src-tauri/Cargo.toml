@@ -26,6 +26,10 @@ tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
 raw-window-handle = "0.6"
 
+# Windows-only: DWM API for disabling native rounded corners
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Graphics_Dwm"] }
+
 # objc2 only compiles on Apple platforms; gating it avoids Windows build failure.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
