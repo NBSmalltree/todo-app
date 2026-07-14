@@ -68,34 +68,13 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             {
                 use raw_window_handle::HasWindowHandle;
-                use windows_sys::Win32::Foundation::{HWND, LRESULT, LPARAM, WPARAM};
-                use windows_sys::Win32::UI::WindowsAndMessaging::{DefSubclassProc, SetWindowSubclass};
-
                 const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
                 const DWMWCP_DONOTROUND: u32 = 1;
-
-                // Subclass the window to suppress the native active-window border and
-                // caption that Windows draws when the window gains focus. On a transparent
-                // rounded window this otherwise fills the corner arcs (solid wedges) and
-                // reveals a native title bar over the custom UI.
-                unsafe extern "system" fn subclass_proc(
-                    hwnd: HWND,
-                    msg: u32,
-                    wparam: WPARAM,
-                    lparam: LPARAM,
-                    _id: usize,
-                    _ref: usize,
-                ) -> LRESULT {
-                    const WM_NCACTIVATE: u32 = 0x0086;
-                    const WM_NCPAINT: u32 = 0x0085;
-                    match msg {
-                        // Report activation as handled so DWM draws no active border/caption
-                        WM_NCACTIVATE => 1,
-                        // Claim the non-client area is already painted (skip default border)
-                        WM_NCPAINT => 0,
-                        _ => DefSubclassProc(hwnd, msg, wparam, lparam),
-                    }
-                }
+                // Remove the native active-window border that Windows draws when a
+                // transparent rounded window gains focus. Otherwise it fills the corner
+                // arcs (solid wedges) and shows a native title-bar strip (issue #2/#3).
+                const DWMWA_BORDERCOLOR: u32 = 34;
+                const DWMWA_COLOR_NONE: u32 = 0xFFFFFFFD;
 
                 for label in &["float", "tray-view", "settings", "quickadd"] {
                     if let Some(window) = app.get_webview_window(label) {
@@ -109,7 +88,12 @@ pub fn run() {
                                         &DWMWCP_DONOTROUND as *const u32 as *const _,
                                         std::mem::size_of::<u32>() as u32,
                                     );
-                                    let _ = SetWindowSubclass(hwnd, Some(subclass_proc), 0, 0);
+                                    windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute(
+                                        hwnd,
+                                        DWMWA_BORDERCOLOR,
+                                        &DWMWA_COLOR_NONE as *const u32 as *const _,
+                                        std::mem::size_of::<u32>() as u32,
+                                    );
                                 }
                             }
                         }
