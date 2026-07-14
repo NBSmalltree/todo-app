@@ -119,7 +119,7 @@ pub fn archive_todo(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) 
         tokio::spawn(async move {
             let settings = {
                 let st = app_clone.state::<AppState>();
-                let db = st.db.lock().unwrap();
+                let db = st.db.lock().unwrap_or_else(|e| e.into_inner());
                 db.get_settings_map().unwrap_or_default()
             };
             if let Some(api_key) = settings.get("api_key").and_then(|v| v.as_str()) {
@@ -128,7 +128,7 @@ pub fn archive_todo(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) 
                     let llm = LLMHelper::new(&settings_value);
                     if let Ok(category) = llm.categorize(&todo_clone.text).await {
                         let st = app_clone.state::<AppState>();
-                        let _ = st.db.lock().unwrap().update_category(todo_clone.id, Some(&category));
+                        let _ = st.db.lock().unwrap_or_else(|e| e.into_inner()).update_category(todo_clone.id, Some(&category));
                         let _ = app_clone.emit_to("tray-view", "data-changed", json!({}));
                     }
                 }

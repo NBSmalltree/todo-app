@@ -88,10 +88,33 @@ export default function ArchiveViewer() {
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
   const searchInputRef = useRef(null);
+  const archivesRef = useRef([]); // ref for polling loop to check without stale closure
 
+  // Load archives on mount — retry with exponential backoff in case the Tauri
+  // IPC bridge isn't fully ready on the first call (common on Windows).
   useEffect(() => {
-    loadArchives();
-    loadCategories();
+    let cancelled = false;
+    let retryTimer = null;
+
+    const pollLoad = async (attempt) => {
+      if (cancelled) return;
+      await loadArchives();
+      await loadCategories();
+      if (cancelled) return;
+
+      const hasData = archivesRef.current.length > 0;
+      if (!hasData && attempt < 8) {
+        const delay = Math.min(100 * Math.pow(2, attempt), 5000);
+        retryTimer = setTimeout(() => pollLoad(attempt + 1), delay);
+      }
+    };
+
+    pollLoad(0);
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [filters]);
 
   // Handle mouse wheel for scaling
@@ -160,6 +183,7 @@ export default function ArchiveViewer() {
     try {
       const data = await api.getArchived(filters);
       setArchives(data);
+      archivesRef.current = data;
     } catch (error) {
       console.error('Failed to load archives:', error);
     } finally {
