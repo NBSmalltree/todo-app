@@ -36,7 +36,7 @@
         "resizable": false,
         "decorations": false,
         "transparent": true,
-        "shadow": true,
+        "shadow": false,
         "visible": false,
         "url": "/#/tray"
       },
@@ -48,7 +48,7 @@
         "resizable": false,
         "decorations": false,
         "transparent": true,
-        "shadow": true,
+        "shadow": false,
         "visible": false,
         "url": "/#/settings"
       },
@@ -62,7 +62,7 @@
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "shadow": true,
+        "shadow": false,
         "visible": false,
         "url": "/#/quickadd"
       }

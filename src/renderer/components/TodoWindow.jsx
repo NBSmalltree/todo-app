@@ -621,7 +621,7 @@ export default function TodoWindow() {
 
   return (
     <div className="h-full" style={{ opacity }}>
-      <div className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 relative">
+      <div className="h-full flex flex-col bg-white rounded-xl overflow-hidden border border-gray-100 relative">
       {/* Title Bar - Draggable */}
       <div
         className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100"
