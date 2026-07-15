@@ -8,6 +8,14 @@ import api from './api';
 export default function App() {
   const [route, setRoute] = useState(window.location.hash.replace('#', '') || '/');
 
+  // Expose current window type as a data attribute on <html> so CSS can
+  // apply per-window overrides (e.g. removing #root border-radius for quickadd).
+  useEffect(() => {
+    const windowName = route === '/' ? 'float'
+      : route.replace(/^\//, ''); // '/quickadd' → 'quickadd'
+    document.documentElement.setAttribute('data-window', windowName);
+  }, [route]);
+
   useEffect(() => {
     // Listen for navigation events — only respond if hash changes
     // NOTE: onNavigate is only needed for windows that may be
