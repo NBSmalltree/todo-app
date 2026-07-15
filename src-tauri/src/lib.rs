@@ -16,6 +16,83 @@ pub struct AppState {
     pub scale: std::sync::Mutex<f64>,
 }
 
+/// Apply DWM attributes and strip native border styles for a single window.
+/// Called once during setup and again on every focus change so that Windows
+/// never resets the transparent/borderless look.
+#[cfg(target_os = "windows")]
+fn apply_dwm_borderless(window: &tauri::WebviewWindow) {
+    use raw_window_handle::HasWindowHandle;
+    use windows_sys::Win32::Foundation::HWND;
+
+    const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
+    const DWMWCP_DONOTROUND: u32 = 1;
+    const DWMWA_BORDERCOLOR: u32 = 34;
+    const DWMWA_COLOR_NONE: u32 = 0xFFFFFFFD;
+    // Disable non-client-area rendering so Windows never draws its own
+    // title bar, borders or shadow chrome around transparent webview windows.
+    const DWMWA_NCRENDERING_POLICY: u32 = 2;
+    const DWMNCRP_DISABLED: u32 = 1;
+
+    if let Ok(wh) = window.window_handle() {
+        if let raw_window_handle::RawWindowHandle::Win32(handle) = wh.as_raw() {
+            let hwnd = handle.hwnd.get() as HWND;
+            unsafe {
+                // --- DWM attributes ---
+                windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute(
+                    hwnd,
+                    DWMWA_WINDOW_CORNER_PREFERENCE,
+                    &DWMWCP_DONOTROUND as *const u32 as *const _,
+                    std::mem::size_of::<u32>() as u32,
+                );
+                windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute(
+                    hwnd,
+                    DWMWA_BORDERCOLOR,
+                    &DWMWA_COLOR_NONE as *const u32 as *const _,
+                    std::mem::size_of::<u32>() as u32,
+                );
+                windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute(
+                    hwnd,
+                    DWMWA_NCRENDERING_POLICY,
+                    &DWMNCRP_DISABLED as *const u32 as *const _,
+                    std::mem::size_of::<u32>() as u32,
+                );
+
+                // --- Strip residual Win32 border styles ---
+                use windows_sys::Win32::UI::WindowsAndMessaging::*;
+
+                // Normal styles: remove any border / sizing frame / caption
+                let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+                let clean_style = style
+                    & !(WS_BORDER as isize)
+                    & !(WS_DLGFRAME as isize)
+                    & !(WS_THICKFRAME as isize)
+                    & !(WS_CAPTION as isize);
+                if clean_style != style {
+                    SetWindowLongPtrW(hwnd, GWL_STYLE, clean_style);
+                }
+
+                // Extended styles: remove 3-D / static / window edge borders
+                let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+                let clean_ex = ex_style
+                    & !(WS_EX_CLIENTEDGE as isize)
+                    & !(WS_EX_STATICEDGE as isize)
+                    & !(WS_EX_WINDOWEDGE as isize);
+                if clean_ex != ex_style {
+                    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, clean_ex);
+                }
+
+                // Force the window frame to refresh without moving/resizing.
+                SetWindowPos(
+                    hwnd,
+                    0 as HWND, // ignored (HWND_TOP placeholder)
+                    0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE,
+                );
+            }
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -61,42 +138,14 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            // On Windows 11, disable DWM native rounded corners so CSS
-            // border-radius on the web content handles all rounding.
-            // This eliminates the solid-color bleed behind the CSS arcs and
-            // removes the black edge lines caused by DWM shadow/rounding mismatch.
+            // On Windows, apply DWM + Win32 borderless tweaks to every window
+            // at startup. They will be re-applied on every focus change (see
+            // on_window_event below) to counter DWM resets.
             #[cfg(target_os = "windows")]
             {
-                use raw_window_handle::HasWindowHandle;
-                const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
-                const DWMWCP_DONOTROUND: u32 = 1;
-                // Remove the native active-window border that Windows draws when a
-                // transparent rounded window gains focus. Otherwise it fills the corner
-                // arcs (solid wedges) and shows a native title-bar strip (issue #2/#3).
-                const DWMWA_BORDERCOLOR: u32 = 34;
-                const DWMWA_COLOR_NONE: u32 = 0xFFFFFFFD;
-
                 for label in &["float", "tray-view", "settings", "quickadd"] {
                     if let Some(window) = app.get_webview_window(label) {
-                        if let Ok(wh) = window.window_handle() {
-                            if let raw_window_handle::RawWindowHandle::Win32(handle) = wh.as_raw() {
-                                let hwnd = handle.hwnd.get() as *mut _;
-                                unsafe {
-                                    windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute(
-                                        hwnd,
-                                        DWMWA_WINDOW_CORNER_PREFERENCE,
-                                        &DWMWCP_DONOTROUND as *const u32 as *const _,
-                                        std::mem::size_of::<u32>() as u32,
-                                    );
-                                    windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute(
-                                        hwnd,
-                                        DWMWA_BORDERCOLOR,
-                                        &DWMWA_COLOR_NONE as *const u32 as *const _,
-                                        std::mem::size_of::<u32>() as u32,
-                                    );
-                                }
-                            }
-                        }
+                        apply_dwm_borderless(&window);
                     }
                 }
             }
@@ -228,6 +277,18 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             let label = window.label().to_string();
+
+            // Re-apply DWM borderless attributes on every focus change so
+            // Windows never reverts to its native border / corner chrome.
+            #[cfg(target_os = "windows")]
+            {
+                if matches!(event, tauri::WindowEvent::Focused(_)) {
+                    if label == "float" || label == "quickadd" || label == "tray-view" || label == "settings" {
+                        apply_dwm_borderless(window);
+                    }
+                }
+            }
+
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if label == "float" || label == "quickadd" || label == "tray-view" || label == "settings" {
                     api.prevent_close();

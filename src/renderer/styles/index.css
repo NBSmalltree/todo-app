@@ -319,3 +319,15 @@ input, textarea {
   to { transform: translateY(0); opacity: 1; }
 }
 .animate-slideUp { animation: slideUp 0.25s ease-out; }
+/* ===== QuickAdd Window — full-bleed coverage ===== */
+/* Ensures no transparent gap through which the native window title
+   ("TodoFloat") can bleed on Windows. The #root border-radius is removed
+   so the content fully covers the native window area. The visible input
+   bar inside QuickAdd has its own rounded corners via Tailwind. */
+[data-window="quickadd"] #root {
+  border-radius: 0 !important;
+}
+
+[data-window="quickadd"] body {
+  background: transparent;
+}
