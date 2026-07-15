@@ -22,7 +22,7 @@ pub struct AppState {
 /// Called once during setup and again on every focus change so that Windows
 /// never resets the transparent/borderless look.
 #[cfg(target_os = "windows")]
-fn apply_dwm_borderless(window: &tauri::WebviewWindow) {
+fn apply_dwm_borderless(window: &impl raw_window_handle::HasWindowHandle) {
     use raw_window_handle::HasWindowHandle;
     use windows_sys::Win32::Foundation::HWND;
 
