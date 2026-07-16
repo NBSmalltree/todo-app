@@ -642,6 +642,7 @@ input, textarea {
    bar inside QuickAdd has its own rounded corners via Tailwind. */
 [data-window="quickadd"] #root {
   border-radius: 0 !important;
+  background: #ffffff;
 }
 
 [data-window="quickadd"] body {
