@@ -16,16 +16,88 @@ pub struct AppState {
     pub scale: std::sync::Mutex<f64>,
 }
 
-/// Apply DWM attributes and strip native border styles for a single window.
-/// Called once during setup and again on every focus change so that Windows
-/// never resets the transparent/borderless look.
+// ---------------------------------------------------------------------------
+// Windows: borderless / transparent window helpers
+// ---------------------------------------------------------------------------
+
+/// Property name used to store the original window procedure pointer
+/// in a window property (so our WM_NCACTIVATE subclass can chain back to it).
+#[cfg(target_os = "windows")]
+static ORIG_PROC_PROP: std::sync::OnceLock<Vec<u16>> = std::sync::OnceLock::new();
+
+#[cfg(target_os = "windows")]
+fn orig_proc_prop_name() -> *const u16 {
+    ORIG_PROC_PROP
+        .get_or_init(|| "__todofloat_orig\0".encode_utf16().collect())
+        .as_ptr()
+}
+
+/// Window procedure that intercepts WM_NCACTIVATE to prevent Windows from
+/// rendering the non-client area (title bar, borders) when the window loses focus.
+///
+/// Without this, a Tauri window with `decorations: false` + `transparent: true`
+/// will briefly show a native title bar every time the user clicks outside it.
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn ncactivate_window_proc(
+    hwnd: windows_sys::Win32::Foundation::HWND,
+    msg: u32,
+    wparam: windows_sys::Win32::Foundation::WPARAM,
+    lparam: windows_sys::Win32::Foundation::LPARAM,
+) -> windows_sys::Win32::Foundation::LRESULT {
+    use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+    use windows_sys::Win32::UI::WindowsAndMessaging::*;
+
+    const WM_NCACTIVATE: u32 = 0x0086;
+
+    // Suppress the inactive non-client-area rendering entirely.
+    // Returning TRUE tells Windows "we handled it" — no title bar ever appears.
+    if msg == WM_NCACTIVATE {
+        return 1;
+    }
+
+    // Chain to the original window procedure (Tauri/winit).
+    let original = GetPropW(hwnd, orig_proc_prop_name());
+    if !original.is_null() {
+        let orig_proc: unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT =
+            std::mem::transmute(original);
+        CallWindowProcW(Some(orig_proc), hwnd, msg, wparam, lparam)
+    } else {
+        DefWindowProcW(hwnd, msg, wparam, lparam)
+    }
+}
+
+/// Install the WM_NCACTIVATE subclass on a single window.
+/// Must be called once per window during setup.
+#[cfg(target_os = "windows")]
+fn install_ncactivate_handler(window: &impl raw_window_handle::HasWindowHandle) {
+    use windows_sys::Win32::Foundation::HWND;
+    use windows_sys::Win32::UI::WindowsAndMessaging::*;
+
+    if let Ok(wh) = window.window_handle() {
+        if let raw_window_handle::RawWindowHandle::Win32(handle) = wh.as_raw() {
+            let hwnd = handle.hwnd.get() as HWND;
+            unsafe {
+                let original = GetWindowLongPtrW(hwnd, GWLP_WNDPROC);
+                // Store the original proc pointer in a named window property
+                // so the subclass can find it at message-dispatch time.
+                SetPropW(hwnd, orig_proc_prop_name(), original as isize as _);
+                SetWindowLongPtrW(hwnd, GWLP_WNDPROC, ncactivate_window_proc as *const () as isize);
+            }
+        }
+    }
+}
+
+/// Apply DWM attributes and strip native Win32 border styles for a single window.
+/// Uses Windows 11 native rounded corners (DWMWCP_ROUND) instead of disabling
+/// them, so corners stay rounded even when the window loses focus.
+///
+/// Called once during setup and again on every focus change as a safety net.
 #[cfg(target_os = "windows")]
 fn apply_dwm_borderless(window: &impl raw_window_handle::HasWindowHandle) {
-    use raw_window_handle::HasWindowHandle;
     use windows_sys::Win32::Foundation::HWND;
 
     const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
-    const DWMWCP_DONOTROUND: u32 = 1;
+    const DWMWCP_ROUND: u32 = 2; // let Windows 11 manage rounded corners natively
     const DWMWA_BORDERCOLOR: u32 = 34;
     const DWMWA_COLOR_NONE: u32 = 0xFFFFFFFD;
     // Disable non-client-area rendering so Windows never draws its own
@@ -38,10 +110,11 @@ fn apply_dwm_borderless(window: &impl raw_window_handle::HasWindowHandle) {
             let hwnd = handle.hwnd.get() as HWND;
             unsafe {
                 // --- DWM attributes ---
+                // DWMWCP_ROUND: Windows 11+ native rounded corners
                 windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute(
                     hwnd,
                     DWMWA_WINDOW_CORNER_PREFERENCE,
-                    &DWMWCP_DONOTROUND as *const u32 as *const _,
+                    &DWMWCP_ROUND as *const u32 as *const _,
                     std::mem::size_of::<u32>() as u32,
                 );
                 windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute(
@@ -145,6 +218,7 @@ pub fn run() {
             {
                 for label in &["float", "tray-view", "settings", "quickadd"] {
                     if let Some(window) = app.get_webview_window(label) {
+                        install_ncactivate_handler(&window);
                         apply_dwm_borderless(&window);
                     }
                 }
