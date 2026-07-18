@@ -47,6 +47,7 @@ pub struct PomodoroSession {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkAnalysisData {
     pub period: String,
     pub total_items: i64,
@@ -57,6 +58,7 @@ pub struct WorkAnalysisData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PomodoroStats {
     pub total_sessions: i64,
     pub total_focus_minutes: i64,

@@ -36,10 +36,11 @@ export default function WorkAnalysis() {
     };
   }, []);
 
+  // Load data on mount and when period/dataVersion changes
   useEffect(() => {
     loadAnalysis();
     loadPomodoroStats();
-  }, [period]);
+  }, [period, dataVersion]);
 
   const loadAnalysis = async () => {
     setIsLoading(true);
