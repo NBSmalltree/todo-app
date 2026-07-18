@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import DueDatePicker from './DueDatePicker';
 import PomodoroPanel from './PomodoroPanel';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import api from '../api';
 
@@ -516,31 +517,76 @@ export default function TodoWindow() {
     api.openTrayWindow();
   };
 
-  // Corner resize handlers
-  const handleResizeStart = useCallback((e, corner) => {
+  // Corner resize handlers — resize window directly like native border drag
+  const handleResizeStart = useCallback(async (e, corner) => {
     e.preventDefault();
-    setIsResizing(true);
-    setResizeStart({
-      x: e.clientX,
-      y: e.clientY,
-      corner,
-      scale,
-    });
-  }, [scale]);
+    e.stopPropagation();
+    try {
+      const win = getCurrentWindow();
+      const startSize = await win.outerSize();
+      const startPos = await win.outerPosition();
+      setIsResizing(true);
+      setResizeStart({
+        x: e.clientX,
+        y: e.clientY,
+        corner,
+        width: startSize.width,
+        height: startSize.height,
+        posX: startPos.x,
+        posY: startPos.y,
+      });
+    } catch (err) {
+      console.error('Failed to start resize:', err);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isResizing || !resizeStart) return;
 
     const handleMouseMove = (e) => {
-      const dx = e.clientX - resizeStart.x;
-      const dy = e.clientY - resizeStart.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const direction = dx + dy > 0 ? 1 : -1;
-      const scaleDelta = (distance * direction * 0.002);
-      const newScale = Math.max(0.3, Math.min(2.5, resizeStart.scale + scaleDelta));
-      scaleRef.current = newScale;
-      setScale(newScale);
-      api.adjustScale(newScale);
+      const dpr = window.devicePixelRatio || 1;
+      const dx = (e.clientX - resizeStart.x) * dpr;
+      const dy = (e.clientY - resizeStart.y) * dpr;
+      const minWidth = 200;
+      const minHeight = 150;
+
+      const { corner, width, height, posX, posY } = resizeStart;
+
+      let newWidth, newHeight, newX, newY;
+
+      switch (corner) {
+        case 'se':
+          newWidth = Math.max(minWidth, width + dx);
+          newHeight = Math.max(minHeight, height + dy);
+          newX = posX;
+          newY = posY;
+          break;
+        case 'sw':
+          newWidth = Math.max(minWidth, width - dx);
+          newHeight = Math.max(minHeight, height + dy);
+          newX = posX + width - newWidth;
+          newY = posY;
+          break;
+        case 'ne':
+          newWidth = Math.max(minWidth, width + dx);
+          newHeight = Math.max(minHeight, height - dy);
+          newX = posX;
+          newY = posY + height - newHeight;
+          break;
+        case 'nw':
+        default:
+          newWidth = Math.max(minWidth, width - dx);
+          newHeight = Math.max(minHeight, height - dy);
+          newX = posX + width - newWidth;
+          newY = posY + height - newHeight;
+          break;
+      }
+
+      const win = getCurrentWindow();
+      Promise.all([
+        win.setSize({ width: newWidth, height: newHeight }),
+        win.setPosition({ x: newX, y: newY }),
+      ]).catch(() => {});
     };
 
     const handleMouseUp = () => {

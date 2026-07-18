@@ -105,7 +105,7 @@ pub fn restore_todo(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) 
 }
 
 #[tauri::command]
-pub fn archive_todo(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) -> Result<Value, String> {
+pub async fn archive_todo(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) -> Result<Value, String> {
     if !is_positive_int(&json!(id)) {
         return Err("Invalid id".to_string());
     }
@@ -498,7 +498,21 @@ pub fn window_get_scale(state: State<'_, AppState>) -> Result<f64, String> {
 
 #[tauri::command]
 pub fn window_adjust_scale(app: tauri::AppHandle, state: State<'_, AppState>, scale: f64) -> Result<f64, String> {
+    let old_scale = *state.scale.lock().unwrap();
     let clamped = scale.clamp(0.3, 2.5);
+
+    // Resize the float window proportionally with the scale change
+    if old_scale > 0.0 && (clamped - old_scale).abs() > f64::EPSILON {
+        if let Some(window) = app.get_webview_window("float") {
+            if let Ok(size) = window.outer_size() {
+                let ratio = clamped / old_scale;
+                let new_width = ((size.width as f64) * ratio).round() as u32;
+                let new_height = ((size.height as f64) * ratio).round() as u32;
+                let _ = window.set_size(tauri::PhysicalSize::new(new_width, new_height));
+            }
+        }
+    }
+
     *state.scale.lock().unwrap() = clamped;
     let _ = app.emit_to("float", "scale-changed", clamped);
     Ok(clamped)
