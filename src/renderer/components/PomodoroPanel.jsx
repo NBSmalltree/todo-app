@@ -171,11 +171,35 @@ export default function PomodoroPanel({ todos }) {
   };
 
   const handlePause = async () => {
-    try { await api.pomodoroPause(); } catch (e) { console.error('Pause failed:', e); }
+    // Optimistic UI update — instantly show paused state
+    setState(prev => ({ ...prev, isPaused: true }));
+    try {
+      const result = await api.pomodoroPause();
+      if (result && result.success === false) {
+        console.warn('Pomodoro pause rejected, rolling back UI');
+        setState(prev => ({ ...prev, isPaused: false }));
+      }
+    } catch (e) {
+      console.error('Pause failed:', e);
+      setState(prev => ({ ...prev, isPaused: false }));
+    }
+    // Verify final state with backend
     loadState();
   };
   const handleResume = async () => {
-    try { await api.pomodoroResume(); } catch (e) { console.error('Resume failed:', e); }
+    // Optimistic UI update — instantly show running state
+    setState(prev => ({ ...prev, isPaused: false }));
+    try {
+      const result = await api.pomodoroResume();
+      if (result && result.success === false) {
+        console.warn('Pomodoro resume rejected, rolling back UI');
+        setState(prev => ({ ...prev, isPaused: true }));
+      }
+    } catch (e) {
+      console.error('Resume failed:', e);
+      setState(prev => ({ ...prev, isPaused: true }));
+    }
+    // Verify final state with backend
     loadState();
   };
   const handleStop = async () => {
