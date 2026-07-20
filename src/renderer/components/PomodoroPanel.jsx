@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import api from '../api';
+import CustomSelect from './CustomSelect';
 
 export default function PomodoroPanel({ todos }) {
   const [expanded, setExpanded] = useState(false);
@@ -254,16 +255,15 @@ export default function PomodoroPanel({ todos }) {
             {!state.isRunning && !state.isPaused && (
               <div className="w-full max-w-xs">
                 <label className="block text-[11px] text-gray-400 mb-1">关联任务（可选）</label>
-                <select
+                <CustomSelect
                   value={selectedTaskId || ''}
-                  onChange={(e) => setSelectedTaskId(e.target.value ? Number(e.target.value) : null)}
-                  className="w-full px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-200 cursor-pointer"
-                >
-                  <option value="">无关联任务</option>
-                  {activeTodos.map((t) => (
-                    <option key={t.id} value={t.id}>{t.text}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedTaskId(val ? Number(val) : null)}
+                  options={[
+                    { value: '', label: '无关联任务' },
+                    ...activeTodos.map((t) => ({ value: t.id, label: t.text })),
+                  ]}
+                  placeholder="无关联任务"
+                />
               </div>
             )}
 
