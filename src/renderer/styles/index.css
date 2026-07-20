@@ -180,10 +180,14 @@ input, textarea {
   background-color: #181825 !important;
 }
 
+/* Dark title bar for all windows — solid color overrides gradient */
 [data-theme="dark"] .bg-gradient-to-r.from-sky-50.to-blue-50 {
-  background: linear-gradient(to right, #1e293b, #1e3a5f) !important;
+  background: #0f0f1a !important;
+  background-image: none !important;
 }
-
+[data-theme="dark"] .drag-region {
+  border-color: #1a1a2e !important;
+}
 [data-theme="dark"] .text-gray-800,
 [data-theme="dark"] .text-gray-700 {
   color: #cdd6f4 !important;
@@ -255,13 +259,7 @@ input, textarea {
   border-color: #1e3a5f !important;
 }
 
-/* Dark title bar for float window */
-[data-theme="dark"] .drag-region.bg-white {
-  background-color: #0f0f1a !important;
-}
-[data-theme="dark"] .drag-region.border-gray-200 {
-  border-color: #1a1a2e !important;
-}
+/* Dark mode drag-region button overrides */
 [data-theme="dark"] .drag-region .text-gray-700 {
   color: #cdd6f4 !important;
 }
@@ -470,8 +468,13 @@ input, textarea {
   background-color: #ede7d9 !important;
 }
 
+/* Eye-care: title bar — solid warm color overrides gradient */
 [data-theme="eye-care"] .bg-gradient-to-r.from-sky-50.to-blue-50 {
-  background: linear-gradient(to right, #f0ebe0, #e8e0d0) !important;
+  background: #3d3529 !important;
+  background-image: none !important;
+}
+[data-theme="eye-care"] .drag-region {
+  border-color: #4a4035 !important;
 }
 
 [data-theme="eye-care"] .text-gray-800 {
@@ -544,13 +547,7 @@ input, textarea {
   background-color: #e0f0e0 !important;
 }
 
-/* Eye-care: title bar for float window */
-[data-theme="eye-care"] .drag-region.bg-white {
-  background-color: #3d3529 !important;
-}
-[data-theme="eye-care"] .drag-region.border-gray-200 {
-  border-color: #4a4035 !important;
-}
+/* Eye-care mode drag-region button overrides */
 [data-theme="eye-care"] .drag-region .text-gray-700 {
   color: #d9d0c0 !important;
 }

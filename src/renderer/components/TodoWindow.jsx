@@ -622,7 +622,7 @@ export default function TodoWindow() {
       <div className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 relative">
       {/* Title Bar - Draggable */}
       <div
-        className="drag-region flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200"
+        className="drag-region flex items-center justify-between px-4 py-2 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-gray-100"
         onMouseDown={(e) => {
           if (e.target === e.currentTarget || e.target.closest('[data-drag-area]')) {
             api.startDragging?.();
