@@ -208,10 +208,9 @@ export default function PomodoroPanel({ todos }) {
       {/* Expanded content */}
       {expanded && (
         <div className="p-4 space-y-4">
-          {/* Timer circle */}
+          {/* Timer circle — always centered */}
           <div className="flex flex-col items-center gap-3">
             <div className="relative w-32 h-32">
-              {/* Background circle */}
               <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
                 <circle cx="60" cy="60" r={radius} fill="none" stroke={theme === 'dark' ? '#313244' : '#f1f5f9'} strokeWidth="6" />
                 <circle
@@ -225,7 +224,6 @@ export default function PomodoroPanel({ todos }) {
                   className="transition-all duration-1000 ease-linear"
                 />
               </svg>
-              {/* Center text */}
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className={`text-2xl font-bold tabular-nums ${accentColor}`}>
                   {formatTime(state.timeRemaining || (expanded ? 0 : state.totalDuration) || (25 * 60))}
@@ -233,6 +231,13 @@ export default function PomodoroPanel({ todos }) {
                 <span className="text-[10px] text-gray-400 mt-0.5">{cycleLabel}</span>
               </div>
             </div>
+
+            {/* Current task display when running */}
+            {state.isRunning && state.taskText && (
+              <div className="text-xs text-gray-500 text-center max-w-[200px] truncate">
+                📌 {state.taskText}
+              </div>
+            )}
 
             {/* Cycle indicators */}
             <div className="flex items-center gap-1.5">
@@ -250,42 +255,37 @@ export default function PomodoroPanel({ todos }) {
                 第 {state.cyclesCompleted + 1} 轮
               </span>
             </div>
-
-            {/* Task selector */}
-            {!state.isRunning && !state.isPaused && (
-              <div className="w-full max-w-xs">
-                <label className="block text-[11px] text-gray-400 mb-1">关联任务（可选）</label>
-                <CustomSelect
-                  value={selectedTaskId || ''}
-                  onChange={(val) => setSelectedTaskId(val ? Number(val) : null)}
-                  options={[
-                    { value: '', label: '无关联任务' },
-                    ...activeTodos.map((t) => ({ value: t.id, label: t.text })),
-                  ]}
-                  placeholder="无关联任务"
-                />
-              </div>
-            )}
-
-            {/* Current task display when running */}
-            {state.isRunning && state.taskText && (
-              <div className="text-xs text-gray-500 text-center max-w-[200px] truncate">
-                📌 {state.taskText}
-              </div>
-            )}
           </div>
 
-          {/* Action buttons — only "开始专注" when not running; header has controls when running */}
+          {/* Task selector card — idle state only, full-width with subtle background */}
           {!state.isRunning && !state.isPaused && (
-            <div className="flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={handleStart}
-                className="px-5 py-2 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors"
-              >
-                开始专注
-              </button>
+            <div className="bg-gray-50 rounded-lg px-3 py-2.5">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs">📌</span>
+                <span className="text-xs text-gray-500">关联任务</span>
+                <span className="text-[10px] text-gray-300">可选</span>
+              </div>
+              <CustomSelect
+                value={selectedTaskId || ''}
+                onChange={(val) => setSelectedTaskId(val ? Number(val) : null)}
+                options={[
+                  { value: '', label: '无关联任务' },
+                  ...activeTodos.map((t) => ({ value: t.id, label: t.text })),
+                ]}
+                placeholder="无关联任务"
+              />
             </div>
+          )}
+
+          {/* Start button — idle state only */}
+          {!state.isRunning && !state.isPaused && (
+            <button
+              type="button"
+              onClick={handleStart}
+              className="w-full py-2.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors"
+            >
+              开始专注
+            </button>
           )}
         </div>
       )}
