@@ -11,9 +11,9 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
 pub struct AppState {
-    pub db: std::sync::Mutex<Database>,
+    pub db: parking_lot::Mutex<Database>,
     pub pomodoro: PomodoroState,
-    pub scale: std::sync::Mutex<f64>,
+    pub scale: parking_lot::Mutex<f64>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -24,7 +24,7 @@ pub fn run() {
                 .with_handler(|app, shortcut, event| {
                     if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                         let state = app.state::<AppState>();
-                        let settings = state.db.lock().unwrap().get_settings_map().unwrap_or_default();
+                        let settings = state.db.lock().get_settings_map().unwrap_or_default();
                         let default_toggle = if cfg!(target_os = "macos") { "Cmd+Shift+T" } else { "Ctrl+Shift+T" };
                         let default_quickadd = if cfg!(target_os = "macos") { "Cmd+Shift+Space" } else { "Ctrl+Shift+Space" };
                         let toggle_str = settings.get("shortcut_toggle")
@@ -85,9 +85,9 @@ pub fn run() {
                 }
             }
 
-            let db = std::sync::Mutex::new(Database::new(app.handle())?);
+            let db = parking_lot::Mutex::new(Database::new(app.handle())?);
             let pomodoro = PomodoroState::new();
-            let scale = std::sync::Mutex::new(1.0);
+            let scale = parking_lot::Mutex::new(1.0);
             app.manage(AppState { db, pomodoro, scale });
 
             // Build tray menu
@@ -167,7 +167,7 @@ pub fn run() {
 
             // Restore window position from previous session
             if let Some(float_win) = app.get_webview_window("float") {
-                let settings = app.state::<AppState>().db.lock().unwrap()
+                let settings = app.state::<AppState>().db.lock()
                     .get_settings_map().unwrap_or_default();
                 if let Some(bounds_str) = settings.get("window_bounds")
                     .and_then(|v| v.as_str())
@@ -203,7 +203,7 @@ pub fn run() {
                             });
                             let mut map = serde_json::Map::new();
                             map.insert("window_bounds".to_string(), serde_json::json!(bounds.to_string()));
-                            let _ = app_handle.state::<AppState>().db.lock().unwrap()
+                            let _ = app_handle.state::<AppState>().db.lock()
                                 .save_settings(&map);
                         }
                     }
@@ -263,6 +263,7 @@ pub fn run() {
             commands::pomodoro_pause,
             commands::pomodoro_resume,
             commands::pomodoro_stop,
+            commands::pomodoro_complete,
             commands::pomodoro_get_sessions,
             commands::pomodoro_get_stats,
         ])
@@ -283,7 +284,7 @@ fn start_reminder_polling(handle: &tauri::AppHandle) {
             let remind_minutes: i64;
             {
                 let state = handle.state::<AppState>();
-                let db = state.db.lock().unwrap();
+                let db = state.db.lock();
                 let settings = match db.get_settings_map() {
                     Ok(s) => s,
                     Err(_) => continue,
@@ -295,7 +296,7 @@ fn start_reminder_polling(handle: &tauri::AppHandle) {
 
             {
                 let state = handle.state::<AppState>();
-                let db = state.db.lock().unwrap();
+                let db = state.db.lock();
                 if let Ok(active_ids) = db.get_active_todo_ids() {
                     reminded_ids.retain(|id| active_ids.contains(id));
                 }
@@ -304,7 +305,7 @@ fn start_reminder_polling(handle: &tauri::AppHandle) {
             let due_tasks: Vec<crate::database::Todo>;
             {
                 let state = handle.state::<AppState>();
-                let db = state.db.lock().unwrap();
+                let db = state.db.lock();
                 due_tasks = db.get_due_soon(remind_minutes).unwrap_or_default();
             }
 

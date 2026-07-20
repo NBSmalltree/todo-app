@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import api from '../api';
 
@@ -58,29 +58,9 @@ export default function Settings() {
   const [shortcutToggle, setShortcutToggle] = useState('');
   const [shortcutQuickAdd, setShortcutQuickAdd] = useState('');
   const [recording, setRecording] = useState(null); // 'toggle' | 'quickadd' | null
-  const [scale, setScale] = useState(1);
-  const scaleRef = useRef(scale);
-  scaleRef.current = scale;
 
   useEffect(() => {
     loadSettings();
-  }, []);
-
-  // Handle mouse wheel for scaling
-  useEffect(() => {
-    const handleWheel = (e) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const raw = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
-        const delta = -(raw / 2000);
-        const newScale = Math.max(0.3, Math.min(2.5, scaleRef.current + delta));
-        scaleRef.current = newScale;
-        setScale(newScale);
-      }
-    };
-
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => window.removeEventListener('wheel', handleWheel, { passive: false });
   }, []);
 
   // Press Escape to close settings window
@@ -94,11 +74,6 @@ export default function Settings() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  // Apply scale to root font size
-  useEffect(() => {
-    document.documentElement.style.fontSize = `${scale * 16}px`;
-  }, [scale]);
 
   // Apply theme whenever it changes, and persist it immediately
   useEffect(() => {
@@ -490,7 +465,7 @@ export default function Settings() {
                 defaultValue={shortcutToggle}
                 onChange={(val) => {
                   setShortcutToggle(val);
-                  api.updateShortcuts({ toggle: val, quickadd: shortcutQuickAdd }).catch(() => {});
+                  api.updateShortcuts(val, shortcutQuickAdd).catch(() => {});
                 }}
               />
               <ShortcutRecorder
@@ -498,7 +473,7 @@ export default function Settings() {
                 defaultValue={shortcutQuickAdd}
                 onChange={(val) => {
                   setShortcutQuickAdd(val);
-                  api.updateShortcuts({ toggle: shortcutToggle, quickadd: val }).catch(() => {});
+                  api.updateShortcuts(shortcutToggle, val).catch(() => {});
                 }}
               />
               <p className="text-xs text-gray-400">点击上方按钮，然后按下您想要设置的快捷键组合</p>

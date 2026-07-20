@@ -27,6 +27,8 @@ pub struct InnerState {
     pub task_text: Option<String>,
     pub session_id: Option<i64>,
     pub start_time: Option<i64>, // timestamp millis
+    pub pause_start: Option<i64>, // timestamp millis when pause began
+    pub total_paused_ms: i64,    // accumulated pause time in millis
 }
 
 pub struct PomodoroState {
@@ -47,6 +49,8 @@ impl PomodoroState {
                 task_text: None,
                 session_id: None,
                 start_time: None,
+                pause_start: None,
+                total_paused_ms: 0,
             })),
         }
     }
@@ -88,6 +92,8 @@ impl InnerState {
         self.task_text = task_text;
         self.session_id = Some(session_id);
         self.start_time = Some(chrono::Utc::now().timestamp_millis());
+        self.pause_start = None;
+        self.total_paused_ms = 0;
     }
 
     pub fn start_break(
@@ -107,25 +113,44 @@ impl InnerState {
         self.task_text = task_text;
         self.session_id = Some(session_id);
         self.start_time = Some(chrono::Utc::now().timestamp_millis());
+        self.pause_start = None;
+        self.total_paused_ms = 0;
     }
 
     pub fn pause(&mut self) {
         if self.is_running {
             self.is_paused = true;
+            self.pause_start = Some(chrono::Utc::now().timestamp_millis());
         }
     }
 
     pub fn resume(&mut self) {
         if self.is_running && self.is_paused {
+            if let Some(pause_start) = self.pause_start {
+                self.total_paused_ms += chrono::Utc::now().timestamp_millis() - pause_start;
+            }
             self.is_paused = false;
+            self.pause_start = None;
         }
+    }
+
+    /// Compute actual (non-paused) elapsed time in seconds.
+    fn actual_elapsed_secs(&self) -> Option<i64> {
+        self.start_time.map(|t| {
+            let now = chrono::Utc::now().timestamp_millis();
+            let paused_ms = if self.is_paused {
+                // Include current uncommitted pause segment
+                self.total_paused_ms + self.pause_start.map(|p| now - p).unwrap_or(0)
+            } else {
+                self.total_paused_ms
+            };
+            (now - t - paused_ms) / 1000
+        })
     }
 
     pub fn stop(&mut self) -> (Option<i64>, Option<i64>) {
         let session_id = self.session_id;
-        let actual_duration = self.start_time.map(|t| {
-            (chrono::Utc::now().timestamp_millis() - t) / 1000
-        });
+        let actual_duration = self.actual_elapsed_secs();
 
         self.is_running = false;
         self.is_paused = false;
@@ -136,6 +161,8 @@ impl InnerState {
         self.task_text = None;
         self.session_id = None;
         self.start_time = None;
+        self.pause_start = None;
+        self.total_paused_ms = 0;
 
         (session_id, actual_duration)
     }
@@ -150,9 +177,7 @@ impl InnerState {
         if self.time_remaining <= 0 {
             self.is_running = false;
             let session_id = self.session_id;
-            let actual_duration = self.start_time.map(|t| {
-                (chrono::Utc::now().timestamp_millis() - t) / 1000
-            });
+            let actual_duration = self.actual_elapsed_secs();
 
             if self.cycle_type == "focus" {
                 self.cycles_completed += 1;

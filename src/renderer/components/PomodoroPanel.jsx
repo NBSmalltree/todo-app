@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import api from '../api';
 
@@ -17,6 +17,22 @@ export default function PomodoroPanel({ todos }) {
   });
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const mountedRef = useRef(true);
+  const stateRef = useRef(state);
+  const intervalRef = useRef(null);
+  const [theme, setTheme] = useState('light');
+
+  // Keep stateRef in sync
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  // Detect theme
+  useEffect(() => {
+    setTheme(document.documentElement.getAttribute('data-theme') || 'light');
+    let unlisten;
+    api.onThemeChanged?.((t) => setTheme(t)).then(fn => { if (fn) unlisten = fn; });
+    return () => { if (unlisten) unlisten(); };
+  }, []);
 
   // Load initial state on mount
   const loadState = async () => {
@@ -30,7 +46,9 @@ export default function PomodoroPanel({ todos }) {
     loadState();
     let unlistenRef = null;
     api.onPomodoroStateChanged?.((newState) => {
-      if (mountedRef.current) setState(newState);
+      if (mountedRef.current) {
+        setState(newState);
+      }
     }).then(fn => { if (fn) unlistenRef = fn; });
 
     return () => {
@@ -38,6 +56,54 @@ export default function PomodoroPanel({ todos }) {
       if (unlistenRef) unlistenRef();
     };
   }, []);
+
+  // Frontend-driven countdown timer
+  const stopFrontendTimer = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const handleComplete = useCallback(async () => {
+    stopFrontendTimer();
+    const s = stateRef.current;
+    try {
+      await api.pomodoroComplete({
+        actualDuration: s.totalDuration,
+        taskText: s.taskText,
+      });
+    } catch (e) {
+      console.error('Failed to complete pomodoro:', e);
+    }
+    // Reload state from backend (now in break or idle)
+    loadState();
+  }, [stopFrontendTimer]);
+
+  useEffect(() => {
+    stopFrontendTimer();
+
+    if (!state.isRunning || state.isPaused) return;
+
+    // Start a 1-second countdown that only touches React state
+    intervalRef.current = setInterval(() => {
+      if (!mountedRef.current) return;
+      const s = stateRef.current;
+      if (!s.isRunning || s.isPaused) {
+        stopFrontendTimer();
+        return;
+      }
+      if (s.timeRemaining <= 1) {
+        // Timer done — complete via backend
+        setState(prev => ({ ...prev, timeRemaining: 0 }));
+        handleComplete();
+        return;
+      }
+      setState(prev => ({ ...prev, timeRemaining: prev.timeRemaining - 1 }));
+    }, 1000);
+
+    return stopFrontendTimer;
+  }, [state.isRunning, state.isPaused, stopFrontendTimer, handleComplete]);
 
   // Format seconds to MM:SS
   const formatTime = (seconds) => {
@@ -56,8 +122,6 @@ export default function PomodoroPanel({ todos }) {
   const accentColor = isFocus ? 'text-rose-500' : 'text-emerald-500';
   const bgColor = isFocus ? 'bg-rose-50' : 'bg-emerald-50';
   const borderColor = isFocus ? 'border-rose-200' : 'border-emerald-200';
-  const hoverBg = isFocus ? 'hover:bg-rose-100' : 'hover:bg-emerald-100';
-  const ringColor = isFocus ? 'focus:ring-rose-200' : 'focus:ring-emerald-200';
   const cycleLabel = isFocus ? '专注' : state.cycleType === 'short_break' ? '短休息' : '长休息';
 
   const handleStart = async () => {
@@ -69,11 +133,17 @@ export default function PomodoroPanel({ todos }) {
       if (todo) taskText = todo.text;
     }
     await api.pomodoroStart({ taskId: taskId || null, taskText });
+    // Reload state from backend (it now has the correct initial timeRemaining)
+    loadState();
   };
 
-  const handlePause = async () => { await api.pomodoroPause(); };
-  const handleResume = async () => { await api.pomodoroResume(); };
-  const handleStop = async () => { await api.pomodoroStop(); };
+  const handlePause = async () => { await api.pomodoroPause(); loadState(); };
+  const handleResume = async () => { await api.pomodoroResume(); loadState(); };
+  const handleStop = async () => {
+    stopFrontendTimer();
+    await api.pomodoroStop();
+    loadState();
+  };
 
   const activeTodos = (todos || []).filter((t) => !t.completed && !t.archived);
 
@@ -110,17 +180,17 @@ export default function PomodoroPanel({ todos }) {
             <>
               {state.isPaused ? (
                 <span onClick={(e) => { e.stopPropagation(); handleResume(); }}
-                  className={`text-[10px] px-1.5 py-0.5 rounded ${isFocus ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
+                  className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${isFocus ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
                   继续
                 </span>
               ) : (
                 <span onClick={(e) => { e.stopPropagation(); handlePause(); }}
-                  className={`text-[10px] px-1.5 py-0.5 rounded ${isFocus ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
+                  className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${isFocus ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
                   暂停
                 </span>
               )}
               <span onClick={(e) => { e.stopPropagation(); handleStop(); }}
-                className="text-[10px] px-1 py-0.5 rounded text-gray-400 border border-gray-200 hover:bg-gray-50">
+                className="text-[10px] px-1 py-0.5 rounded cursor-pointer text-gray-400 border border-gray-200 hover:bg-gray-50">
                 结束
               </span>
             </>
@@ -142,7 +212,7 @@ export default function PomodoroPanel({ todos }) {
             <div className="relative w-32 h-32">
               {/* Background circle */}
               <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r={radius} fill="none" stroke="#f1f5f9" strokeWidth="6" />
+                <circle cx="60" cy="60" r={radius} fill="none" stroke={theme === 'dark' ? '#313244' : '#f1f5f9'} strokeWidth="6" />
                 <circle
                   cx="60" cy="60" r={radius}
                   fill="none"

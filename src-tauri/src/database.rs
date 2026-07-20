@@ -738,8 +738,16 @@ impl Database {
 
     // ===== Close =====
 
-    pub fn close(&self) -> Result<(), rusqlite::Error> {
-        // Connection is closed when dropped
+    pub fn close(&mut self) -> Result<(), rusqlite::Error> {
+        // rusqlite::Connection drops cleanly on its own; this is a no-op marker.
+        Ok(())
+    }
+
+    /// Replace the underlying connection, e.g. after restoring a backup.
+    pub fn reopen(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.conn = Connection::open(&self.db_path)?;
+        self.conn.pragma_update(None, "journal_mode", "WAL")?;
+        self.conn.pragma_update(None, "foreign_keys", "ON")?;
         Ok(())
     }
 

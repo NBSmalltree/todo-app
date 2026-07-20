@@ -22,6 +22,17 @@ export default function WorkAnalysis() {
   const [pomodoroStats, setPomodoroStats] = useState(null);
   const [pomodoroLoading, setPomodoroLoading] = useState(false);
   const [dataVersion, setDataVersion] = useState(0);
+  const [theme, setTheme] = useState('light');
+  const analysisRef = useRef(null);
+  const pomodoroRef = useRef(null);
+
+  useEffect(() => {
+    const t = document.documentElement.getAttribute('data-theme') || 'light';
+    setTheme(t);
+    let unlisten2;
+    api.onThemeChanged?.((newTheme) => setTheme(newTheme)).then(fn => { if (fn) unlisten2 = fn; });
+    return () => { if (unlisten2) unlisten2(); };
+  }, []);
 
   useEffect(() => {
     // Listen for data changes (archive/toggle) → mark cache stale
@@ -154,6 +165,11 @@ export default function WorkAnalysis() {
     );
   }
 
+  const isDark = theme === 'dark';
+  const gridStroke = isDark ? '#313244' : '#f0f0f0';
+  const axisStroke = isDark ? '#6c7086' : '#666';
+  const pomGridStroke = isDark ? '#4c1d32' : '#fce7f3';
+
   const categoryData = prepareCategoryData();
   const dailyData = prepareDailyData();
   const completionRate = calculateCompletionRate();
@@ -231,9 +247,9 @@ export default function WorkAnalysis() {
           <div className="h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                <XAxis dataKey="date" tick={{ fontSize: 12, fill: axisStroke }} />
+                <YAxis tick={{ fontSize: 12, fill: axisStroke }} />
                 <Tooltip />
                 <Bar dataKey="count" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -312,9 +328,9 @@ export default function WorkAnalysis() {
                 <div className="h-[120px] mb-4">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={pomodoroStats.dailyBreakdown}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#fce7f3" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#f43f5e" />
-                      <YAxis tick={{ fontSize: 10 }} stroke="#f43f5e" />
+                      <CartesianGrid strokeDasharray="3 3" stroke={pomGridStroke} />
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#f43f5e' }} stroke="#f43f5e" />
+                      <YAxis tick={{ fontSize: 10, fill: '#f43f5e' }} stroke="#f43f5e" />
                       <Tooltip />
                       <Bar dataKey="count" fill="#f43f5e" radius={[3, 3, 0, 0]} />
                     </BarChart>

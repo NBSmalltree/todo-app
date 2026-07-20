@@ -80,41 +80,17 @@ export default function ArchiveViewer() {
   const [categorizingId, setCategorizingId] = useState(null); // Track which item is being categorized
   const [toast, setToast] = useState(null); // Toast message and type
   const [undoToast, setUndoToast] = useState(null); // { message, undoAction, timeoutId }
-  const [scale, setScale] = useState(1); // Scale state for zoom
   const [selectMode, setSelectMode] = useState(false);       // 批量选择模式
   const [selectedIds, setSelectedIds] = useState(new Set());  // 已选中的归档 id
   const toastTimeoutRef = useRef(null);
   const searchDebounceRef = useRef(null);
-  const scaleRef = useRef(scale);
-  scaleRef.current = scale;
   const searchInputRef = useRef(null);
 
+  // Load archives on mount and when filters change
   useEffect(() => {
     loadArchives();
     loadCategories();
   }, [filters]);
-
-  // Handle mouse wheel for scaling
-  useEffect(() => {
-    const handleWheel = (e) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const raw = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
-        const delta = -(raw / 2000);
-        const newScale = Math.max(0.3, Math.min(2.5, scaleRef.current + delta));
-        scaleRef.current = newScale;
-        setScale(newScale);
-      }
-    };
-
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => window.removeEventListener('wheel', handleWheel, { passive: false });
-  }, []);
-
-  // Apply scale to root font size
-  useEffect(() => {
-    document.documentElement.style.fontSize = `${scale * 16}px`;
-  }, [scale]);
 
   // Debounce search input: only update filters.searchText after 300ms pause
   useEffect(() => {

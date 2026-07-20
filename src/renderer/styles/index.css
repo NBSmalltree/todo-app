@@ -255,6 +255,166 @@ input, textarea {
   border-color: #1e3a5f !important;
 }
 
+/* Table header in ArchiveViewer */
+[data-theme="dark"] thead.bg-gray-50 {
+  background-color: #181825 !important;
+}
+
+/* Row dividers in ArchiveViewer table */
+[data-theme="dark"] .divide-y > :not([hidden]) ~ :not([hidden]) {
+  border-color: #313244 !important;
+}
+
+/* Color badges */
+[data-theme="dark"] .bg-red-100 {
+  background-color: #451a2a !important;
+}
+[data-theme="dark"] .text-red-600 {
+  color: #fca5a5 !important;
+}
+
+[data-theme="dark"] .bg-amber-50 {
+  background-color: #3d2e0a !important;
+}
+[data-theme="dark"] .text-amber-500,
+[data-theme="dark"] .text-amber-600 {
+  color: #fcd34d !important;
+}
+[data-theme="dark"] .border-amber-100 {
+  border-color: #3d2e0a !important;
+}
+
+[data-theme="dark"] .bg-green-50 {
+  background-color: #0a3d1f !important;
+}
+[data-theme="dark"] .text-green-600 {
+  color: #86efac !important;
+}
+
+[data-theme="dark"] .bg-rose-50 {
+  background-color: #3b1126 !important;
+}
+[data-theme="dark"] .text-rose-400,
+[data-theme="dark"] .text-rose-500 {
+  color: #fda4af !important;
+}
+[data-theme="dark"] .text-rose-600,
+[data-theme="dark"] .text-rose-700 {
+  color: #fda4af !important;
+}
+[data-theme="dark"] .border-rose-100,
+[data-theme="dark"] .border-rose-200 {
+  border-color: #4c1d32 !important;
+}
+
+[data-theme="dark"] .bg-emerald-50 {
+  background-color: #0a3d2a !important;
+}
+[data-theme="dark"] .text-emerald-500,
+[data-theme="dark"] .text-emerald-600 {
+  color: #6ee7b7 !important;
+}
+[data-theme="dark"] .border-emerald-100,
+[data-theme="dark"] .border-emerald-200 {
+  border-color: #0f4d35 !important;
+}
+
+/* Stat card number text (sky-blue headings) */
+[data-theme="dark"] .text-sky-600 {
+  color: #38bdf8 !important;
+}
+[data-theme="dark"] .text-sky-400,
+[data-theme="dark"] .text-sky-500 {
+  color: #7dd3fc !important;
+}
+
+/* Drop indicator in TodoWindow drag */
+[data-theme="dark"] .bg-sky-200\/60 {
+  background-color: rgba(56, 189, 248, 0.2) !important;
+}
+[data-theme="dark"] .bg-sky-400 {
+  background-color: #0284c7 !important;
+}
+
+/* Progress bar backgrounds */
+[data-theme="dark"] .bg-gray-100 {
+  background-color: #313244 !important;
+}
+
+/* Active filter button background */
+[data-theme="dark"] .bg-sky-100 {
+  background-color: #1e3a5f !important;
+}
+[data-theme="dark"] .text-sky-700 {
+  color: #bae6fd !important;
+}
+
+/* WorkAnalysis progress bar track */
+[data-theme="dark"] .bg-gray-100.rounded-full {
+  background-color: #313244 !important;
+}
+
+/* SVG chart text and grid lines */
+[data-theme="dark"] .recharts-text {
+  fill: #6c7086 !important;
+}
+[data-theme="dark"] .recharts-cartesian-grid line {
+  stroke: #313244 !important;
+}
+[data-theme="dark"] .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: #1e1e2e !important;
+  border-color: #45475a !important;
+}
+[data-theme="dark"] .recharts-tooltip-wrapper .recharts-default-tooltip .recharts-tooltip-label {
+  color: #cdd6f4 !important;
+}
+
+/* Tooltip / popover backgrounds */
+[data-theme="dark"] .shadow-lg {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+[data-theme="dark"] .shadow-sm {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Checkbox and radio inputs */
+[data-theme="dark"] input[type="checkbox"] {
+  background-color: #313244 !important;
+  border-color: #45475a !important;
+}
+
+/* Range input track */
+[data-theme="dark"] input[type="range"] {
+  background-color: #313244 !important;
+}
+
+/* Hover on white cards in analysis/stat views */
+[data-theme="dark"] .hover\:bg-gray-50\/50:hover {
+  background-color: rgba(49, 50, 68, 0.5) !important;
+}
+
+/* Prose (markdown) content in dark mode */
+[data-theme="dark"] .prose {
+  color: #cdd6f4 !important;
+}
+[data-theme="dark"] .prose h3,
+[data-theme="dark"] .prose h4 {
+  color: #cdd6f4 !important;
+}
+[data-theme="dark"] .prose strong {
+  color: #f5f5f5 !important;
+}
+[data-theme="dark"] .prose code {
+  color: #f5c67a !important;
+  background-color: #313244 !important;
+}
+[data-theme="dark"] .prose a {
+  color: #7dd3fc !important;
+}
+[data-theme="dark"] .prose li::marker {
+  color: #6c7086 !important;
+}
+
 /* ===== Eye-Care Theme ===== */
 [data-theme="eye-care"] .bg-white {
   background-color: #f5f0e8 !important;
@@ -311,6 +471,32 @@ input, textarea {
 
 [data-theme="eye-care"] ::-webkit-scrollbar-thumb:hover {
   background: #a89880;
+}
+
+/* Eye-care: table and badge overrides */
+[data-theme="eye-care"] thead.bg-gray-50 {
+  background-color: #e8e0d0 !important;
+}
+[data-theme="eye-care"] .divide-y > :not([hidden]) ~ :not([hidden]) {
+  border-color: #d9d0c0 !important;
+}
+[data-theme="eye-care"] .bg-red-100 {
+  background-color: #f5dede !important;
+}
+[data-theme="eye-care"] .bg-amber-50 {
+  background-color: #f5ecd0 !important;
+}
+[data-theme="eye-care"] .bg-rose-50 {
+  background-color: #f5e0e8 !important;
+}
+[data-theme="eye-care"] .bg-emerald-50 {
+  background-color: #e0f0e8 !important;
+}
+[data-theme="eye-care"] .bg-sky-50 {
+  background-color: #e8e0d0 !important;
+}
+[data-theme="eye-care"] .bg-green-50 {
+  background-color: #e0f0e0 !important;
 }
 
 /* Undo toast animation */

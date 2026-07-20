@@ -41,19 +41,19 @@ async fn broadcast_pomodoro_state(handle: &tauri::AppHandle) {
 
 #[tauri::command]
 pub fn get_todos(state: State<'_, AppState>) -> Result<Vec<Value>, String> {
-    let todos = state.db.lock().unwrap().get_todos().map_err(|e| e.to_string())?;
+    let todos = state.db.lock().get_todos().map_err(|e| e.to_string())?;
     Ok(todos.iter().map(|t| serde_json::to_value(t).unwrap_or_default()).collect())
 }
 
 #[tauri::command]
 pub fn get_active_todos(state: State<'_, AppState>) -> Result<Vec<Value>, String> {
-    let todos = state.db.lock().unwrap().get_active_todos().map_err(|e| e.to_string())?;
+    let todos = state.db.lock().get_active_todos().map_err(|e| e.to_string())?;
     Ok(todos.iter().map(|t| serde_json::to_value(t).unwrap_or_default()).collect())
 }
 
 #[tauri::command]
 pub fn get_future_scheduled_todos(state: State<'_, AppState>) -> Result<Vec<Value>, String> {
-    let todos = state.db.lock().unwrap().get_future_scheduled_todos().map_err(|e| e.to_string())?;
+    let todos = state.db.lock().get_future_scheduled_todos().map_err(|e| e.to_string())?;
     Ok(todos.iter().map(|t| serde_json::to_value(t).unwrap_or_default()).collect())
 }
 
@@ -62,7 +62,7 @@ pub fn add_todo(state: State<'_, AppState>, text: String) -> Result<Value, Strin
     if !is_non_empty_string(&json!(text), 500) {
         return Err("Invalid text".to_string());
     }
-    let todo = state.db.lock().unwrap().add_todo(text.trim()).map_err(|e| e.to_string())?;
+    let todo = state.db.lock().add_todo(text.trim()).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
 }
 
@@ -71,7 +71,7 @@ pub fn toggle_todo(state: State<'_, AppState>, id: i64) -> Result<Value, String>
     if !is_positive_int(&json!(id)) {
         return Err("Invalid id".to_string());
     }
-    let todo = state.db.lock().unwrap().toggle_todo(id).map_err(|e| e.to_string())?;
+    let todo = state.db.lock().toggle_todo(id).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
 }
 
@@ -80,7 +80,7 @@ pub fn delete_todo(state: State<'_, AppState>, id: i64) -> Result<Value, String>
     if !is_positive_int(&json!(id)) {
         return Err("Invalid id".to_string());
     }
-    state.db.lock().unwrap().delete_todo(id).map_err(|e| e.to_string())?;
+    state.db.lock().delete_todo(id).map_err(|e| e.to_string())?;
     Ok(json!({ "success": true }))
 }
 
@@ -89,7 +89,7 @@ pub fn recover_todo(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) 
     if !is_positive_int(&json!(id)) {
         return Err("Invalid id".to_string());
     }
-    let todo = state.db.lock().unwrap().recover_todo(id).map_err(|e| e.to_string())?;
+    let todo = state.db.lock().recover_todo(id).map_err(|e| e.to_string())?;
     let _ = app.emit_to("float", "data-changed", json!({}));
     serde_json::to_value(todo).map_err(|e| e.to_string())
 }
@@ -99,7 +99,7 @@ pub fn restore_todo(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) 
     if !is_positive_int(&json!(id)) {
         return Err("Invalid id".to_string());
     }
-    let todo = state.db.lock().unwrap().restore_todo(id).map_err(|e| e.to_string())?;
+    let todo = state.db.lock().restore_todo(id).map_err(|e| e.to_string())?;
     let _ = app.emit_to("float", "data-changed", json!({}));
     serde_json::to_value(todo).map_err(|e| e.to_string())
 }
@@ -109,7 +109,7 @@ pub async fn archive_todo(app: tauri::AppHandle, state: State<'_, AppState>, id:
     if !is_positive_int(&json!(id)) {
         return Err("Invalid id".to_string());
     }
-    let todo = state.db.lock().unwrap().archive_todo(id).map_err(|e| e.to_string())?;
+    let todo = state.db.lock().archive_todo(id).map_err(|e| e.to_string())?;
     let _ = app.emit_to("tray-view", "data-changed", json!({}));
 
     // Auto-categorize if no category and API key is set
@@ -119,7 +119,7 @@ pub async fn archive_todo(app: tauri::AppHandle, state: State<'_, AppState>, id:
         tokio::spawn(async move {
             let settings = {
                 let st = app_clone.state::<AppState>();
-                let db = st.db.lock().unwrap();
+                let db = st.db.lock();
                 db.get_settings_map().unwrap_or_default()
             };
             if let Some(api_key) = settings.get("api_key").and_then(|v| v.as_str()) {
@@ -128,7 +128,7 @@ pub async fn archive_todo(app: tauri::AppHandle, state: State<'_, AppState>, id:
                     let llm = LLMHelper::new(&settings_value);
                     if let Ok(category) = llm.categorize(&todo_clone.text).await {
                         let st = app_clone.state::<AppState>();
-                        let _ = st.db.lock().unwrap().update_category(todo_clone.id, Some(&category));
+                        let _ = st.db.lock().update_category(todo_clone.id, Some(&category));
                         let _ = app_clone.emit_to("tray-view", "data-changed", json!({}));
                     }
                 }
@@ -145,7 +145,7 @@ pub fn get_archived(state: State<'_, AppState>, filters: Option<Value>) -> Resul
     if !f.is_object() {
         return Ok(vec![]);
     }
-    let todos = state.db.lock().unwrap().get_archived(&f).map_err(|e| e.to_string())?;
+    let todos = state.db.lock().get_archived(&f).map_err(|e| e.to_string())?;
     Ok(todos.iter().map(|t| serde_json::to_value(t).unwrap_or_default()).collect())
 }
 
@@ -154,7 +154,7 @@ pub fn update_note(state: State<'_, AppState>, id: i64, note: String) -> Result<
     if !is_positive_int(&json!(id)) {
         return Err("Invalid id".to_string());
     }
-    let todo = state.db.lock().unwrap().update_note(id, &note).map_err(|e| e.to_string())?;
+    let todo = state.db.lock().update_note(id, &note).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
 }
 
@@ -163,7 +163,7 @@ pub fn update_category(state: State<'_, AppState>, id: i64, category: Option<Str
     if !is_positive_int(&json!(id)) {
         return Err("Invalid id".to_string());
     }
-    let todo = state.db.lock().unwrap().update_category(id, category.as_deref()).map_err(|e| e.to_string())?;
+    let todo = state.db.lock().update_category(id, category.as_deref()).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
 }
 
@@ -186,7 +186,7 @@ pub fn set_due_date(state: State<'_, AppState>, id: i64, due_date: Option<String
             }
         }
     }
-    let todo = state.db.lock().unwrap().set_due_date(id, due_date.as_deref()).map_err(|e| e.to_string())?;
+    let todo = state.db.lock().set_due_date(id, due_date.as_deref()).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
 }
 
@@ -195,13 +195,13 @@ pub fn set_scheduled_date(state: State<'_, AppState>, id: i64, date_str: Option<
     if !is_positive_int(&json!(id)) {
         return Err("Invalid id".to_string());
     }
-    let todo = state.db.lock().unwrap().set_scheduled_date(id, date_str.as_deref()).map_err(|e| e.to_string())?;
+    let todo = state.db.lock().set_scheduled_date(id, date_str.as_deref()).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn get_categories(state: State<'_, AppState>) -> Result<Vec<String>, String> {
-    state.db.lock().unwrap().get_categories().map_err(|e| e.to_string())
+    state.db.lock().get_categories().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -213,7 +213,7 @@ pub fn reorder(state: State<'_, AppState>, orders: Vec<Value>) -> Result<Value, 
             Some((id, sort))
         })
         .collect();
-    state.db.lock().unwrap().update_orders(&parsed).map_err(|e| e.to_string())?;
+    state.db.lock().update_orders(&parsed).map_err(|e| e.to_string())?;
     Ok(json!({ "success": true }))
 }
 
@@ -222,7 +222,7 @@ pub fn update_color(state: State<'_, AppState>, id: i64, color: Option<String>) 
     if !is_positive_int(&json!(id)) {
         return Err("Invalid id".to_string());
     }
-    let todo = state.db.lock().unwrap().update_color(id, color.as_deref()).map_err(|e| e.to_string())?;
+    let todo = state.db.lock().update_color(id, color.as_deref()).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
 }
 
@@ -231,7 +231,7 @@ pub fn update_text(state: State<'_, AppState>, id: i64, text: String) -> Result<
     if !is_positive_int(&json!(id)) || !is_non_empty_string(&json!(text), 500) {
         return Err("Invalid input".to_string());
     }
-    let todo = state.db.lock().unwrap().update_text(id, text.trim()).map_err(|e| e.to_string())?;
+    let todo = state.db.lock().update_text(id, text.trim()).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
 }
 
@@ -242,7 +242,7 @@ pub fn get_subtasks(state: State<'_, AppState>, todo_id: i64) -> Result<Vec<Valu
     if !is_positive_int(&json!(todo_id)) {
         return Ok(vec![]);
     }
-    let subs = state.db.lock().unwrap().get_subtasks(todo_id).map_err(|e| e.to_string())?;
+    let subs = state.db.lock().get_subtasks(todo_id).map_err(|e| e.to_string())?;
     Ok(subs.iter().map(|s| serde_json::to_value(s).unwrap_or_default()).collect())
 }
 
@@ -251,7 +251,7 @@ pub fn add_subtask(state: State<'_, AppState>, todo_id: i64, text: String) -> Re
     if !is_positive_int(&json!(todo_id)) || !is_non_empty_string(&json!(text), 500) {
         return Err("Invalid input".to_string());
     }
-    let sub = state.db.lock().unwrap().add_subtask(todo_id, text.trim()).map_err(|e| e.to_string())?;
+    let sub = state.db.lock().add_subtask(todo_id, text.trim()).map_err(|e| e.to_string())?;
     serde_json::to_value(sub).map_err(|e| e.to_string())
 }
 
@@ -260,7 +260,7 @@ pub fn toggle_subtask(state: State<'_, AppState>, id: i64) -> Result<Value, Stri
     if !is_positive_int(&json!(id)) {
         return Err("Invalid id".to_string());
     }
-    let sub = state.db.lock().unwrap().toggle_subtask(id).map_err(|e| e.to_string())?;
+    let sub = state.db.lock().toggle_subtask(id).map_err(|e| e.to_string())?;
     serde_json::to_value(sub).map_err(|e| e.to_string())
 }
 
@@ -269,7 +269,7 @@ pub fn delete_subtask(state: State<'_, AppState>, id: i64) -> Result<Value, Stri
     if !is_positive_int(&json!(id)) {
         return Ok(json!({ "success": false }));
     }
-    state.db.lock().unwrap().delete_subtask(id).map_err(|e| e.to_string())?;
+    state.db.lock().delete_subtask(id).map_err(|e| e.to_string())?;
     Ok(json!({ "success": true }))
 }
 
@@ -278,7 +278,7 @@ pub fn update_subtask_text(state: State<'_, AppState>, id: i64, text: String) ->
     if !is_positive_int(&json!(id)) || !is_non_empty_string(&json!(text), 500) {
         return Err("Invalid input".to_string());
     }
-    let sub = state.db.lock().unwrap().update_subtask_text(id, text.trim()).map_err(|e| e.to_string())?;
+    let sub = state.db.lock().update_subtask_text(id, text.trim()).map_err(|e| e.to_string())?;
     serde_json::to_value(sub).map_err(|e| e.to_string())
 }
 
@@ -286,14 +286,14 @@ pub fn update_subtask_text(state: State<'_, AppState>, id: i64, text: String) ->
 
 #[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Result<Value, String> {
-    let map = state.db.lock().unwrap().get_settings_map().map_err(|e| e.to_string())?;
+    let map = state.db.lock().get_settings_map().map_err(|e| e.to_string())?;
     Ok(Value::Object(map))
 }
 
 #[tauri::command]
 pub fn save_settings(state: State<'_, AppState>, settings: Value) -> Result<Value, String> {
     if let Value::Object(map) = settings {
-        state.db.lock().unwrap().save_settings(&map).map_err(|e| e.to_string())?;
+        state.db.lock().save_settings(&map).map_err(|e| e.to_string())?;
         Ok(json!({ "success": true }))
     } else {
         Err("Invalid settings".to_string())
@@ -306,7 +306,7 @@ pub fn save_settings(state: State<'_, AppState>, settings: Value) -> Result<Valu
 pub fn get_work_analysis(state: State<'_, AppState>, period: String) -> Result<Value, String> {
     let valid = ["week", "month", "year"];
     let p = if valid.contains(&period.as_str()) { &period } else { "week" };
-    let analysis = state.db.lock().unwrap().get_work_analysis(p).map_err(|e| e.to_string())?;
+    let analysis = state.db.lock().get_work_analysis(p).map_err(|e| e.to_string())?;
     serde_json::to_value(analysis).map_err(|e| e.to_string())
 }
 
@@ -314,7 +314,7 @@ pub fn get_work_analysis(state: State<'_, AppState>, period: String) -> Result<V
 
 #[tauri::command]
 pub async fn llm_categorize(state: State<'_, AppState>, text: String) -> Result<Option<String>, String> {
-    let settings = state.db.lock().unwrap().get_settings_map().map_err(|e| e.to_string())?;
+    let settings = state.db.lock().get_settings_map().map_err(|e| e.to_string())?;
     if settings.get("api_key").and_then(|v| v.as_str()).map_or(true, |s| s.is_empty()) {
         return Ok(None);
     }
@@ -324,7 +324,7 @@ pub async fn llm_categorize(state: State<'_, AppState>, text: String) -> Result<
 
 #[tauri::command]
 pub async fn llm_analyze_work(state: State<'_, AppState>, data: Value) -> Result<Option<String>, String> {
-    let settings = state.db.lock().unwrap().get_settings_map().map_err(|e| e.to_string())?;
+    let settings = state.db.lock().get_settings_map().map_err(|e| e.to_string())?;
     if settings.get("api_key").and_then(|v| v.as_str()).map_or(true, |s| s.is_empty()) {
         return Ok(None);
     }
@@ -361,7 +361,7 @@ pub async fn test_notification(app: tauri::AppHandle) -> Result<Value, String> {
 
 #[tauri::command]
 pub fn get_shortcuts(state: State<'_, AppState>) -> Result<Value, String> {
-    let settings = state.db.lock().unwrap().get_settings_map().map_err(|e| e.to_string())?;
+    let settings = state.db.lock().get_settings_map().map_err(|e| e.to_string())?;
     let default_toggle = if cfg!(target_os = "macos") { "Cmd+Shift+T" } else { "Ctrl+Shift+T" };
     let default_quickadd = if cfg!(target_os = "macos") { "Cmd+Shift+Space" } else { "Ctrl+Shift+Space" };
     
@@ -372,11 +372,44 @@ pub fn get_shortcuts(state: State<'_, AppState>) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub fn update_shortcuts(state: State<'_, AppState>, toggle: String, quickadd: String) -> Result<Value, String> {
+pub fn update_shortcuts(app: tauri::AppHandle, state: State<'_, AppState>, toggle: String, quickadd: String) -> Result<Value, String> {
+    // Get old shortcuts to unregister them first
+    let (old_toggle, old_quickadd) = {
+        let settings = state.db.lock().get_settings_map().map_err(|e| e.to_string())?;
+        let default_toggle = if cfg!(target_os = "macos") { "Cmd+Shift+T" } else { "Ctrl+Shift+T" };
+        let default_quickadd = if cfg!(target_os = "macos") { "Cmd+Shift+Space" } else { "Ctrl+Shift+Space" };
+        (
+            settings.get("shortcut_toggle").and_then(|v| v.as_str()).unwrap_or(default_toggle).to_string(),
+            settings.get("shortcut_quickadd").and_then(|v| v.as_str()).unwrap_or(default_quickadd).to_string(),
+        )
+    };
+
+    // Unregister old shortcuts
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+    if let Ok(old_sc) = old_toggle.parse::<tauri_plugin_global_shortcut::Shortcut>() {
+        let _ = app.global_shortcut().unregister(old_sc);
+    }
+    if let Ok(old_sc) = old_quickadd.parse::<tauri_plugin_global_shortcut::Shortcut>() {
+        let _ = app.global_shortcut().unregister(old_sc);
+    }
+
+    // Save new shortcuts to DB
     let mut map = serde_json::Map::new();
     map.insert("shortcut_toggle".to_string(), json!(toggle));
     map.insert("shortcut_quickadd".to_string(), json!(quickadd));
-    state.db.lock().unwrap().save_settings(&map).map_err(|e| e.to_string())?;
+    state.db.lock().save_settings(&map).map_err(|e| e.to_string())?;
+
+    // Register new shortcuts
+    for (label, key) in [("toggle", &toggle), ("quickadd", &quickadd)] {
+        match key.parse::<tauri_plugin_global_shortcut::Shortcut>() {
+            Ok(sc) => match app.global_shortcut().register(sc) {
+                Ok(_) => println!("[Shortcut] Re-registered {}: {}", label, key),
+                Err(e) => eprintln!("[Shortcut] Failed to re-register {} ({}): {}", label, key, e),
+            },
+            Err(e) => eprintln!("[Shortcut] Invalid format {} ({}): {}", label, key, e),
+        }
+    }
+
     Ok(json!({ "success": true }))
 }
 
@@ -388,12 +421,12 @@ pub fn quick_add(app: tauri::AppHandle, state: State<'_, AppState>, text: String
         return Err("Invalid text".to_string());
     }
     let trimmed = text.trim().to_string();
-    let todo = state.db.lock().unwrap().add_todo(&trimmed).map_err(|e| e.to_string())?;
+    let todo = state.db.lock().add_todo(&trimmed).map_err(|e| e.to_string())?;
     if let Some(ref cat) = category {
-        let _ = state.db.lock().unwrap().update_category(todo.id, Some(cat));
+        let _ = state.db.lock().update_category(todo.id, Some(cat));
     }
     if let Some(ref dd) = due_date {
-        let _ = state.db.lock().unwrap().set_due_date(todo.id, Some(&format!("{} 23:59:59", dd)));
+        let _ = state.db.lock().set_due_date(todo.id, Some(&format!("{} 23:59:59", dd)));
     }
     let _ = app.emit_to("float", "data-changed", json!({}));
     Ok(json!({ "success": true }))
@@ -412,14 +445,14 @@ pub async fn export_csv(app: tauri::AppHandle, state: State<'_, AppState>, filte
     use tauri_plugin_dialog::DialogExt;
     let export_type = filters.get("exportType").and_then(|v| v.as_str()).unwrap_or("active");
     let items = match export_type {
-        "archived" => state.db.lock().unwrap().get_archived(&filters).map_err(|e| e.to_string())?,
+        "archived" => state.db.lock().get_archived(&filters).map_err(|e| e.to_string())?,
         "all" => {
-            let mut active = state.db.lock().unwrap().get_todos().map_err(|e| e.to_string())?;
-            let archived = state.db.lock().unwrap().get_archived(&filters).map_err(|e| e.to_string())?;
+            let mut active = state.db.lock().get_todos().map_err(|e| e.to_string())?;
+            let archived = state.db.lock().get_archived(&filters).map_err(|e| e.to_string())?;
             active.extend(archived);
             active
         }
-        _ => state.db.lock().unwrap().get_todos().map_err(|e| e.to_string())?,
+        _ => state.db.lock().get_todos().map_err(|e| e.to_string())?,
     };
 
     if items.is_empty() {
@@ -493,12 +526,12 @@ pub fn window_is_maximized(window: Window) -> Result<bool, String> {
 
 #[tauri::command]
 pub fn window_get_scale(state: State<'_, AppState>) -> Result<f64, String> {
-    Ok(*state.scale.lock().unwrap())
+    Ok(*state.scale.lock())
 }
 
 #[tauri::command]
 pub fn window_adjust_scale(app: tauri::AppHandle, state: State<'_, AppState>, scale: f64) -> Result<f64, String> {
-    let old_scale = *state.scale.lock().unwrap();
+    let old_scale = *state.scale.lock();
     let clamped = scale.clamp(0.3, 2.5);
 
     // Resize the float window proportionally with the scale change
@@ -513,7 +546,7 @@ pub fn window_adjust_scale(app: tauri::AppHandle, state: State<'_, AppState>, sc
         }
     }
 
-    *state.scale.lock().unwrap() = clamped;
+    *state.scale.lock() = clamped;
     let _ = app.emit_to("float", "scale-changed", clamped);
     Ok(clamped)
 }
@@ -557,7 +590,7 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub async fn backup_database(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Value, String> {
     use tauri_plugin_dialog::DialogExt;
-    let db_path = state.db.lock().unwrap().get_db_path().clone();
+    let db_path = state.db.lock().get_db_path().clone();
     let default_name = format!("todo-app-backup-{}.db", chrono::Local::now().format("%Y-%m-%d"));
 
     let file_path = tokio::task::spawn_blocking(move || {
@@ -580,7 +613,7 @@ pub async fn backup_database(app: tauri::AppHandle, state: State<'_, AppState>) 
 #[tauri::command]
 pub async fn restore_database(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Value, String> {
     use tauri_plugin_dialog::DialogExt;
-    let db_path = state.db.lock().unwrap().get_db_path().clone();
+    let db_path = state.db.lock().get_db_path().clone();
 
     let file_path = tokio::task::spawn_blocking(move || {
         app.dialog()
@@ -591,8 +624,11 @@ pub async fn restore_database(app: tauri::AppHandle, state: State<'_, AppState>)
 
     if let Some(file_path) = file_path {
         let path = std::path::PathBuf::from(file_path.to_string());
-        let _ = state.db.lock().unwrap().close();
+        // Drop the current connection before overwriting the file
+        state.db.lock().close().map_err(|e| e.to_string())?;
         std::fs::copy(&path, &db_path).map_err(|e| e.to_string())?;
+        // Reopen the connection to the restored database
+        state.db.lock().reopen().map_err(|e| e.to_string())?;
         Ok(json!({ "success": true }))
     } else {
         Ok(json!({ "success": false, "error": "用户取消" }))
@@ -616,12 +652,12 @@ pub async fn pomodoro_start(
 ) -> Result<Value, String> {
     // Get DB data FIRST (before pomodoro lock)
     let (focus_minutes, session) = {
-        let settings = state.db.lock().unwrap().get_settings_map().map_err(|e| e.to_string())?;
+        let settings = state.db.lock().get_settings_map().map_err(|e| e.to_string())?;
         let focus_minutes = settings.get("pomodoro_focus")
             .and_then(|v| v.as_i64()).unwrap_or(25);
         let duration = focus_minutes * 60;
 
-        let session = state.db.lock().unwrap().add_pomodoro_session(
+        let session = state.db.lock().add_pomodoro_session(
             task_id,
             task_text.as_deref(),
             duration,
@@ -655,96 +691,6 @@ pub async fn pomodoro_start(
     for label in &["float", "tray-view", "settings", "quickadd"] {
         let _ = app.emit_to(*label, "pomodoro:stateChanged", payload.clone());
     }
-
-    // Start timer tick with auto-cycle (focus → break → ...)
-    let app_clone = app.clone();
-    let task_id_clone = task_id;
-    let task_text_clone = task_text.clone();
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
-        let current_task_id = task_id_clone;
-        let current_task_text = task_text_clone;
-        let mut last_broadcast_paused = false;
-        loop {
-            interval.tick().await;
-
-            let (completed, is_paused_now) = {
-                let state_ref = app_clone.state::<AppState>();
-                let mut inner = state_ref.pomodoro.get_inner().await;
-                if !inner.is_running { break; }
-                let paused = inner.is_paused;
-                let result = if paused { None } else { inner.tick() };
-                (result, paused)
-            };
-
-            // Skip broadcast when paused state hasn't changed
-            if is_paused_now && last_broadcast_paused {
-                continue;
-            }
-            last_broadcast_paused = is_paused_now;
-
-            if let Some(tick_result) = completed {
-                if tick_result.completed {
-                    // Record completed session in DB
-                    {
-                        let state_ref = app_clone.state::<AppState>();
-                        let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-                        if let Some(sid) = tick_result.session_id {
-                            let _ = state_ref.db.lock().unwrap().update_pomodoro_session(
-                                sid, Some(&now), tick_result.actual_duration, Some(1),
-                            );
-                        }
-                    }
-
-                    if tick_result.cycle_type == "focus" {
-                        // Focus completed → auto-start break
-                        let (break_dur, break_type): (i64, String) = {
-                            let state_ref = app_clone.state::<AppState>();
-                            let settings = state_ref.db.lock().unwrap().get_settings_map().unwrap_or_default();
-                            let total = tick_result.cycles_completed;
-                            let before_long = settings.get("pomodoro_cycles_before_long")
-                                .and_then(|v| v.as_i64()).unwrap_or(4);
-                            if total % before_long == 0 {
-                                (settings.get("pomodoro_long_break").and_then(|v| v.as_i64()).unwrap_or(15) * 60,
-                                 "long_break".to_string())
-                            } else {
-                                (settings.get("pomodoro_short_break").and_then(|v| v.as_i64()).unwrap_or(5) * 60,
-                                 "short_break".to_string())
-                            }
-                        };
-
-                        let break_session = {
-                            let state_ref = app_clone.state::<AppState>();
-                            let db = state_ref.db.lock().unwrap();
-                            db.add_pomodoro_session(
-                                current_task_id, current_task_text.as_deref(),
-                                break_dur, &break_type,
-                            ).ok()
-                        };
-
-                        if let Some(s) = break_session {
-                            let state_ref = app_clone.state::<AppState>();
-                            let mut inner = state_ref.pomodoro.get_inner().await;
-                            let task_text_for_break = current_task_text.clone();
-                            inner.start_break(
-                                current_task_id, task_text_for_break,
-                                break_dur, break_type, s.id,
-                            );
-                        }
-                    } else {
-                        // Break completed → idle
-                        let state_ref = app_clone.state::<AppState>();
-                        let mut inner = state_ref.pomodoro.get_inner().await;
-                        inner.is_running = false;
-                    }
-
-                    broadcast_pomodoro_state(&app_clone).await;
-                }
-            } else if !is_paused_now {
-                broadcast_pomodoro_state(&app_clone).await;
-            }
-        }
-    });
 
     Ok(json!({ "success": true }))
 }
@@ -788,7 +734,64 @@ pub async fn pomodoro_stop(app: tauri::AppHandle, state: State<'_, AppState>) ->
     // Record session as incomplete
     if let Some(sid) = session_id {
         let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let _ = state.db.lock().unwrap().update_pomodoro_session(sid, Some(&now), actual_duration, Some(0));
+        let _ = state.db.lock().update_pomodoro_session(sid, Some(&now), actual_duration, Some(0));
+    }
+
+    broadcast_pomodoro_state(&app).await;
+    Ok(json!({ "success": true }))
+}
+
+#[tauri::command]
+pub async fn pomodoro_complete(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    actual_duration: i64,
+    task_text: Option<String>,
+) -> Result<Value, String> {
+    // Record completed session
+    let (session_id, cycles_completed, current_task_id) = {
+        let inner = state.pomodoro.get_inner().await;
+        (inner.session_id, inner.cycles_completed, inner.task_id)
+    };
+    if let Some(sid) = session_id {
+        let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let _ = state.db.lock().update_pomodoro_session(sid, Some(&now), Some(actual_duration), Some(1));
+    }
+
+    // Auto-start break if this was a focus session
+    let was_focus = {
+        let inner = state.pomodoro.get_inner().await;
+        inner.cycle_type == "focus"
+    };
+
+    if was_focus {
+        let (break_dur, break_type) = {
+            let settings = state.db.lock().get_settings_map().unwrap_or_default();
+            let before_long = settings.get("pomodoro_cycles_before_long")
+                .and_then(|v| v.as_i64()).unwrap_or(4);
+            // cycles_completed was already incremented by the frontend flow
+            let total = cycles_completed + 1;
+            if total % before_long == 0 {
+                (settings.get("pomodoro_long_break").and_then(|v| v.as_i64()).unwrap_or(15) * 60,
+                 "long_break".to_string())
+            } else {
+                (settings.get("pomodoro_short_break").and_then(|v| v.as_i64()).unwrap_or(5) * 60,
+                 "short_break".to_string())
+            }
+        };
+
+        let break_session = state.db.lock().add_pomodoro_session(
+            current_task_id, task_text.as_deref(), break_dur, &break_type,
+        ).ok();
+
+        if let Some(s) = break_session {
+            let mut inner = state.pomodoro.get_inner().await;
+            inner.start_break(current_task_id, task_text, break_dur, break_type, s.id);
+        }
+    } else {
+        // Break completed → go idle
+        let mut inner = state.pomodoro.get_inner().await;
+        inner.is_running = false;
     }
 
     broadcast_pomodoro_state(&app).await;
@@ -797,7 +800,7 @@ pub async fn pomodoro_stop(app: tauri::AppHandle, state: State<'_, AppState>) ->
 
 #[tauri::command]
 pub fn pomodoro_get_sessions(state: State<'_, AppState>) -> Result<Vec<Value>, String> {
-    let sessions = state.db.lock().unwrap().get_pomodoro_sessions(50).map_err(|e| e.to_string())?;
+    let sessions = state.db.lock().get_pomodoro_sessions(50).map_err(|e| e.to_string())?;
     Ok(sessions.iter().map(|s| serde_json::to_value(s).unwrap_or_default()).collect())
 }
 
@@ -805,6 +808,6 @@ pub fn pomodoro_get_sessions(state: State<'_, AppState>) -> Result<Vec<Value>, S
 pub fn pomodoro_get_stats(state: State<'_, AppState>, period: String) -> Result<Value, String> {
     let valid = ["week", "month", "year"];
     let p = if valid.contains(&period.as_str()) { &period } else { "week" };
-    let stats = state.db.lock().unwrap().get_pomodoro_stats(p).map_err(|e| e.to_string())?;
+    let stats = state.db.lock().get_pomodoro_stats(p).map_err(|e| e.to_string())?;
     serde_json::to_value(stats).map_err(|e| e.to_string())
 }

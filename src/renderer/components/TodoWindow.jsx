@@ -60,32 +60,9 @@ export default function TodoWindow() {
     document.documentElement.style.setProperty('--app-font-family', fontFamilyValue);
   };
 
-  // Load todos on mount — retry with exponential backoff in case the Tauri
-  // IPC bridge isn't fully ready on the first call (common on Windows).
+  // Load todos on mount
   useEffect(() => {
-    let cancelled = false;
-    let retryTimer = null;
-
-    const pollLoad = async (attempt) => {
-      if (cancelled) return;
-      await loadTodos();
-      if (cancelled) return;
-
-      // Stop retrying once data has been received or max attempts exhausted
-      const hasData = todosRef.current.length > 0;
-      if (!hasData && attempt < 8) {
-        // Exponential backoff: 100, 200, 400, 800, 1600, 3200, 5000, 5000
-        const delay = Math.min(100 * Math.pow(2, attempt), 5000);
-        retryTimer = setTimeout(() => pollLoad(attempt + 1), delay);
-      }
-    };
-
-    pollLoad(0);
-
-    return () => {
-      cancelled = true;
-      if (retryTimer) clearTimeout(retryTimer);
-    };
+    loadTodos();
   }, []);
 
   // Load and apply theme & opacity on mount, listen for changes

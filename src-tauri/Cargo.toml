@@ -24,6 +24,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
+parking_lot = "0.12"
 raw-window-handle = "0.6"
 
 # objc2 only compiles on Apple platforms; gating it avoids Windows build failure.
