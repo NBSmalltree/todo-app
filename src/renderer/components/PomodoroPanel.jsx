@@ -17,6 +17,7 @@ export default function PomodoroPanel({ todos }) {
     sessionId: null,
   });
   const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [isStarting, setIsStarting] = useState(false);
   const mountedRef = useRef(true);
   const stateRef = useRef(state);
   const intervalRef = useRef(null);
@@ -126,16 +127,27 @@ export default function PomodoroPanel({ todos }) {
   const cycleLabel = isFocus ? '专注' : state.cycleType === 'short_break' ? '短休息' : '长休息';
 
   const handleStart = async () => {
-    const activeTodos = (todos || []).filter((t) => !t.completed && !t.archived);
-    let taskId = selectedTaskId;
-    let taskText = null;
-    if (taskId) {
-      const todo = activeTodos.find((t) => t.id === taskId);
-      if (todo) taskText = todo.text;
+    if (isStarting) return;
+    setIsStarting(true);
+    try {
+      const activeTodos = (todos || []).filter((t) => !t.completed && !t.archived);
+      let taskId = selectedTaskId;
+      let taskText = null;
+      if (taskId) {
+        const todo = activeTodos.find((t) => t.id === taskId);
+        if (todo) taskText = todo.text;
+      }
+      const result = await api.pomodoroStart({ taskId: taskId || null, taskText });
+      if (result?.error) {
+        console.error('Pomodoro start failed:', result.error);
+      }
+      // Reload state from backend (it now has the correct initial timeRemaining)
+      loadState();
+    } catch (e) {
+      console.error('Failed to start pomodoro:', e);
+    } finally {
+      setIsStarting(false);
     }
-    await api.pomodoroStart({ taskId: taskId || null, taskText });
-    // Reload state from backend (it now has the correct initial timeRemaining)
-    loadState();
   };
 
   const handlePause = async () => { await api.pomodoroPause(); loadState(); };
@@ -292,9 +304,20 @@ export default function PomodoroPanel({ todos }) {
             <button
               type="button"
               onClick={handleStart}
-              className="w-full py-2.5 text-sm font-medium text-white bg-amber-500 rounded-lg transition-all duration-200 hover:bg-amber-600 active:scale-[0.98] hover:shadow-md hover:shadow-amber-200"
+              disabled={isStarting}
+              className="w-full py-2.5 text-sm font-medium text-white bg-amber-500 rounded-lg transition-all duration-200 hover:bg-amber-600 active:scale-[0.98] hover:shadow-md hover:shadow-amber-200 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
             >
-              开始专注
+              {isStarting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                  启动中...
+                </span>
+              ) : (
+                '开始专注'
+              )}
             </button>
           )}
         </div>
