@@ -121,6 +121,7 @@ pub fn run() {
                         }
                         "show_archive" => {
                             if let Some(w) = app.get_webview_window("tray-view") {
+                                let _ = w.unminimize();
                                 let _ = w.show();
                                 let _ = w.set_focus();
                                 let _ = app.emit_to("tray-view", "navigate", "/tray");

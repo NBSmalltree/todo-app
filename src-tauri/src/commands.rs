@@ -569,6 +569,7 @@ pub fn window_apply_theme(app: tauri::AppHandle, theme: String) -> Result<(), St
 #[tauri::command]
 pub fn open_tray_window(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("tray-view") {
+        let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
         let _ = app.emit_to("tray-view", "navigate", "/tray");

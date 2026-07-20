@@ -622,7 +622,7 @@ export default function TodoWindow() {
       <div className="h-full flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 relative">
       {/* Title Bar - Draggable */}
       <div
-        className="drag-region flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700"
+        className="drag-region flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200"
         onMouseDown={(e) => {
           if (e.target === e.currentTarget || e.target.closest('[data-drag-area]')) {
             api.startDragging?.();
@@ -634,13 +634,13 @@ export default function TodoWindow() {
             <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="2" />
             <path d="M8 12l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <span className="text-sm font-medium text-gray-200">待办清单</span>
+          <span className="text-sm font-medium text-gray-700">待办清单</span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setShowSearch(!showSearch)}
             className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
-              showSearch ? 'bg-white/15 text-sky-400' : 'hover:bg-white/10 text-gray-400 hover:text-gray-200'
+              showSearch ? 'bg-gray-100 text-sky-500' : 'hover:bg-gray-100 text-gray-400 hover:text-gray-600'
             }`}
             title="搜索 (Cmd+F)"
           >
@@ -655,8 +655,8 @@ export default function TodoWindow() {
             }}
             className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
               selectMode
-                ? 'bg-white/15 text-sky-400'
-                : 'hover:bg-white/10 text-gray-400 hover:text-gray-200'
+                ? 'bg-gray-100 text-sky-500'
+                : 'hover:bg-gray-100 text-gray-400 hover:text-gray-600'
             }`}
             title={selectMode ? '取消选择' : '批量选择'}
           >
@@ -669,7 +669,7 @@ export default function TodoWindow() {
           </button>
           <button
             onClick={handleOpenTray}
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-gray-400 hover:text-gray-200 transition-colors"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
             title="历史归档"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

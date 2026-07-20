@@ -23,8 +23,6 @@ export default function WorkAnalysis() {
   const [pomodoroLoading, setPomodoroLoading] = useState(false);
   const [dataVersion, setDataVersion] = useState(0);
   const [theme, setTheme] = useState('light');
-  const analysisRef = useRef(null);
-  const pomodoroRef = useRef(null);
 
   useEffect(() => {
     const t = document.documentElement.getAttribute('data-theme') || 'light';
