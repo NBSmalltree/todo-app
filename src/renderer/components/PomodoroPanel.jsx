@@ -86,13 +86,29 @@ export default function PomodoroPanel({ todos }) {
     stopFrontendTimer();
 
     if (!state.isRunning || state.isPaused) return;
+    // Defensive: treat timeRemaining ≤ 0 as a stale/phantom session — auto-complete
+    if (state.timeRemaining <= 0) {
+      console.warn('Pomodoro in running state with timeRemaining <= 0 — treating as stale, completing');
+      handleComplete();
+      return;
+    }
 
     // Start a 1-second countdown that only touches React state
+    let tickCount = 0;
     intervalRef.current = setInterval(() => {
+      tickCount++;
       if (!mountedRef.current) return;
       const s = stateRef.current;
       if (!s.isRunning || s.isPaused) {
         stopFrontendTimer();
+        return;
+      }
+      // Re-check every 5 ticks to catch stale state from races
+      if (tickCount % 5 === 0 && s.timeRemaining <= 0) {
+        console.warn('Pomodoro countdown detected timeRemaining <= 0 at tick', tickCount);
+        stopFrontendTimer();
+        setState(prev => ({ ...prev, timeRemaining: 0 }));
+        handleComplete();
         return;
       }
       if (s.timeRemaining <= 1) {
@@ -137,17 +153,14 @@ export default function PomodoroPanel({ todos }) {
         const todo = activeTodos.find((t) => t.id === taskId);
         if (todo) taskText = todo.text;
       }
-      let result = await api.pomodoroStart({ taskId: taskId || null, taskText });
+      const result = await api.pomodoroStart({ taskId: taskId || null, taskText });
       if (result?.error) {
-        // Backend still thinks a timer is running — force-stop and retry
-        console.warn('Pomodoro start rejected, force-stopping stale session:', result.error);
+        // Backend holds a stale session — clean it up and let user retry manually
+        console.warn('Pomodoro start rejected, cleaning up stale session:', result.error);
         await api.pomodoroStop();
         stopFrontendTimer();
-        // Retry with a small delay for backend to settle
-        await new Promise(r => setTimeout(r, 200));
-        result = await api.pomodoroStart({ taskId: taskId || null, taskText });
       }
-      // Reload state from backend
+      // Always sync state with backend after any operation
       loadState();
     } catch (e) {
       console.error('Failed to start pomodoro:', e);
