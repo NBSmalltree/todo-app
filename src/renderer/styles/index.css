@@ -74,12 +74,39 @@ input, textarea {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes expandIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes pulseSoft {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+@keyframes appearUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
 }
 
 .animate-slide-down {
   animation: slideDown 0.15s ease-out;
+}
+
+.animate-expand-in {
+  animation: expandIn 0.25s ease-out;
+}
+
+.animate-pulse-soft {
+  animation: pulseSoft 2s ease-in-out infinite;
+}
+
+.animate-appear-up {
+  animation: appearUp 0.2s ease-out;
 }
 
 /* Context menu */
