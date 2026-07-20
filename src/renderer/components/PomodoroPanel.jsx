@@ -127,7 +127,7 @@ export default function PomodoroPanel({ todos }) {
   const cycleLabel = isFocus ? '专注' : state.cycleType === 'short_break' ? '短休息' : '长休息';
 
   const handleStart = async () => {
-    if (isStarting) return;
+    if (isStarting || state.isRunning) return;
     setIsStarting(true);
     try {
       const activeTodos = (todos || []).filter((t) => !t.completed && !t.archived);
@@ -137,25 +137,44 @@ export default function PomodoroPanel({ todos }) {
         const todo = activeTodos.find((t) => t.id === taskId);
         if (todo) taskText = todo.text;
       }
-      const result = await api.pomodoroStart({ taskId: taskId || null, taskText });
+      let result = await api.pomodoroStart({ taskId: taskId || null, taskText });
       if (result?.error) {
-        console.error('Pomodoro start failed:', result.error);
+        // Backend still thinks a timer is running — force-stop and retry
+        console.warn('Pomodoro start rejected, force-stopping stale session:', result.error);
+        await api.pomodoroStop();
+        stopFrontendTimer();
+        // Retry with a small delay for backend to settle
+        await new Promise(r => setTimeout(r, 200));
+        result = await api.pomodoroStart({ taskId: taskId || null, taskText });
       }
-      // Reload state from backend (it now has the correct initial timeRemaining)
+      // Reload state from backend
       loadState();
     } catch (e) {
       console.error('Failed to start pomodoro:', e);
+      loadState();
     } finally {
       setIsStarting(false);
     }
   };
 
-  const handlePause = async () => { await api.pomodoroPause(); loadState(); };
-  const handleResume = async () => { await api.pomodoroResume(); loadState(); };
-  const handleStop = async () => {
-    stopFrontendTimer();
-    await api.pomodoroStop();
+  const handlePause = async () => {
+    try { await api.pomodoroPause(); } catch (e) { console.error('Pause failed:', e); }
     loadState();
+  };
+  const handleResume = async () => {
+    try { await api.pomodoroResume(); } catch (e) { console.error('Resume failed:', e); }
+    loadState();
+  };
+  const handleStop = async () => {
+    try {
+      stopFrontendTimer();
+      await api.pomodoroStop();
+    } catch (e) {
+      console.error('Stop failed:', e);
+    } finally {
+      stopFrontendTimer();
+      loadState();
+    }
   };
 
   const activeTodos = (todos || []).filter((t) => !t.completed && !t.archived);
