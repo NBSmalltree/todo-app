@@ -412,7 +412,7 @@ export default function ArchiveViewer() {
             <button
               onClick={handleExport}
               disabled={isExporting}
-              className="px-3 py-1.5 text-sm text-white bg-sky-500 rounded-lg hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-sm text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isExporting ? '导出中...' : '导出 CSV'}
             </button>

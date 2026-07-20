@@ -153,7 +153,7 @@ export default function PomodoroPanel({ todos }) {
   const offset = circumference - (progress / 100) * circumference;
 
   return (
-    <div className={`mb-3 rounded-xl border transition-all ${expanded ? borderColor : state.isRunning ? borderColor + ' ' + bgColor : 'border-gray-200'}`}>
+    <div className={`mb-3 rounded-xl border transition-all ${expanded ? borderColor : state.isRunning ? borderColor + ' ' + bgColor : 'border-gray-200'} ${state.isRunning && !expanded ? 'border-l-2 ' + (isFocus ? 'border-l-rose-400' : 'border-l-emerald-400') : ''}`}>
       {/* Collapsed header bar — always toggleable */}
       <button
         type="button"
@@ -165,7 +165,7 @@ export default function PomodoroPanel({ todos }) {
         <span className="text-base">🍅</span>
         <span className="text-sm font-medium text-gray-700">番茄钟</span>
         {state.isRunning && (
-          <span className={`text-xs font-semibold tabular-nums ${accentColor}`}>
+          <span className={`text-sm font-bold tabular-nums ${accentColor}`}>
             {formatTime(state.timeRemaining)}{state.isPaused ? ' 暂停' : ''}
           </span>
         )}
@@ -281,7 +281,7 @@ export default function PomodoroPanel({ todos }) {
               <button
                 type="button"
                 onClick={handleStart}
-                className="px-5 py-2 text-sm font-medium text-white bg-rose-500 hover:bg-rose-600 rounded-lg transition-colors"
+                className="px-5 py-2 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors"
               >
                 开始专注
               </button>
