@@ -21,17 +21,17 @@ export default function CustomSelect({ value, onChange, options, placeholder, cl
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1.5 px-3 py-1.5 text-sm bg-white rounded-lg border transition-all ${
+        className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-sm bg-white rounded-lg border transition-all ${
           open
             ? 'border-sky-400 ring-2 ring-sky-100'
             : 'border-gray-200 hover:border-gray-300'
         }`}
       >
-        <span className={isPlaceholder ? 'text-gray-400' : 'text-gray-700'}>
+        <span className={`truncate ${isPlaceholder ? 'text-gray-400' : 'text-gray-700'}`}>
           {label}
         </span>
         <svg
-          className={`w-3.5 h-3.5 text-gray-400 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`}
+          className={`w-3.5 h-3.5 text-gray-400 transition-transform flex-shrink-0 ml-auto ${open ? 'rotate-180' : ''}`}
           fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
         >
           <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
