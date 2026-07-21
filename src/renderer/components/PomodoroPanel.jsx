@@ -49,7 +49,15 @@ export default function PomodoroPanel({ todos }) {
     let unlistenRef = null;
     api.onPomodoroStateChanged?.((newState) => {
       if (mountedRef.current) {
-        setState(newState);
+        setState(prev => {
+          // During countdown, backend's timeRemaining is stale (never decrements).
+          // Only preserve frontend's timeRemaining when the cycle hasn't changed.
+          // When cycleType changes (e.g. focus→break), use the new duration from backend.
+          if (prev.isRunning && newState.cycleType === prev.cycleType) {
+            return { ...newState, timeRemaining: prev.timeRemaining };
+          }
+          return newState;
+        });
       }
     }).then(fn => { if (fn) unlistenRef = fn; });
 
@@ -142,6 +150,15 @@ export default function PomodoroPanel({ todos }) {
   const borderColor = isFocus ? 'border-rose-200' : 'border-emerald-200';
   const cycleLabel = isFocus ? '专注' : state.cycleType === 'short_break' ? '短休息' : '长休息';
 
+  // SVG ring colors by theme
+  const svgColors = {
+    focus: { light: '#f43f5e', dark: '#f06e88', 'eye-care': '#c47a6b' },
+    break: { light: '#10b981', dark: '#3ec480', 'eye-care': '#6ea88d' },
+    track: { light: '#f1f5f9', dark: '#2b2330', 'eye-care': '#e8e0d0' },
+  };
+  const countingColor = svgColors[isFocus ? 'focus' : 'break'][theme] || svgColors.focus.light;
+  const trackColor = svgColors.track[theme] || svgColors.track.light;
+
   const handleStart = async () => {
     if (isStarting || state.isRunning) return;
     setIsStarting(true);
@@ -183,8 +200,6 @@ export default function PomodoroPanel({ todos }) {
       console.error('Pause failed:', e);
       setState(prev => ({ ...prev, isPaused: false }));
     }
-    // Verify final state with backend
-    loadState();
   };
   const handleResume = async () => {
     // Optimistic UI update — instantly show running state
@@ -199,8 +214,6 @@ export default function PomodoroPanel({ todos }) {
       console.error('Resume failed:', e);
       setState(prev => ({ ...prev, isPaused: true }));
     }
-    // Verify final state with backend
-    loadState();
   };
   const handleStop = async () => {
     try {
@@ -287,12 +300,12 @@ export default function PomodoroPanel({ todos }) {
             <div className={`relative w-32 h-32 transition-transform duration-500 ${state.isRunning ? 'scale-100' : 'scale-95'}`}>
               <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
                 <circle cx="60" cy="60" r={radius} fill="none"
-                  stroke={theme === 'dark' ? '#313244' : '#f1f5f9'} strokeWidth="6"
+                  stroke={trackColor} strokeWidth="6"
                   className="transition-colors duration-300" />
                 <circle
                   cx="60" cy="60" r={radius}
                   fill="none"
-                  stroke={isFocus ? '#f43f5e' : '#10b981'}
+                  stroke={countingColor}
                   strokeWidth="6"
                   strokeLinecap="round"
                   strokeDasharray={circumference}
@@ -301,7 +314,7 @@ export default function PomodoroPanel({ todos }) {
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className={`text-2xl font-bold tabular-nums transition-colors duration-300 ${state.isRunning ? 'animate-pulse-soft' : ''} ${accentColor}`}>
+                <span className={`text-2xl font-bold tabular-nums transition-colors duration-300 ${state.isRunning ? 'animate-pulse-soft' : ''}`} style={{ color: countingColor }}>
                   {formatTime(state.timeRemaining || (expanded ? 0 : state.totalDuration) || (25 * 60))}
                 </span>
                 <span className="text-[10px] text-gray-400 mt-0.5 transition-colors duration-300">

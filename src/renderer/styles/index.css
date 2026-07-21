@@ -362,31 +362,37 @@ input, textarea {
 }
 
 [data-theme="dark"] .bg-rose-50 {
-  background-color: #3b1126 !important;
+  background-color: #2b1626 !important;
 }
 [data-theme="dark"] .text-rose-400,
 [data-theme="dark"] .text-rose-500 {
-  color: #fda4af !important;
+  color: #e895aa !important;
 }
 [data-theme="dark"] .text-rose-600,
 [data-theme="dark"] .text-rose-700 {
-  color: #fda4af !important;
+  color: #e895aa !important;
 }
 [data-theme="dark"] .border-rose-100,
 [data-theme="dark"] .border-rose-200 {
-  border-color: #4c1d32 !important;
+  border-color: #362130 !important;
+}
+[data-theme="dark"] .border-l-rose-400 {
+  border-left-color: #c47588 !important;
 }
 
 [data-theme="dark"] .bg-emerald-50 {
-  background-color: #0a3d2a !important;
+  background-color: #0d3026 !important;
 }
 [data-theme="dark"] .text-emerald-500,
 [data-theme="dark"] .text-emerald-600 {
-  color: #6ee7b7 !important;
+  color: #5abf88 !important;
 }
 [data-theme="dark"] .border-emerald-100,
 [data-theme="dark"] .border-emerald-200 {
-  border-color: #0f4d35 !important;
+  border-color: #133c30 !important;
+}
+[data-theme="dark"] .border-l-emerald-400 {
+  border-left-color: #5abf88 !important;
 }
 
 /* Stat card number text (sky-blue headings) */
@@ -562,10 +568,36 @@ input, textarea {
   background-color: #f5ecd0 !important;
 }
 [data-theme="eye-care"] .bg-rose-50 {
-  background-color: #f5e0e8 !important;
+  background-color: #efe0d5 !important;
+}
+[data-theme="eye-care"] .text-rose-400,
+[data-theme="eye-care"] .text-rose-500 {
+  color: #9b5c50 !important;
+}
+[data-theme="eye-care"] .text-rose-600,
+[data-theme="eye-care"] .text-rose-700 {
+  color: #9b5c50 !important;
+}
+[data-theme="eye-care"] .border-rose-100,
+[data-theme="eye-care"] .border-rose-200 {
+  border-color: #e0cec0 !important;
+}
+[data-theme="eye-care"] .border-l-rose-400 {
+  border-left-color: #b87a6e !important;
 }
 [data-theme="eye-care"] .bg-emerald-50 {
-  background-color: #e0f0e8 !important;
+  background-color: #e0efe5 !important;
+}
+[data-theme="eye-care"] .text-emerald-500,
+[data-theme="eye-care"] .text-emerald-600 {
+  color: #4a8c6a !important;
+}
+[data-theme="eye-care"] .border-emerald-100,
+[data-theme="eye-care"] .border-emerald-200 {
+  border-color: #c8dcc8 !important;
+}
+[data-theme="eye-care"] .border-l-emerald-400 {
+  border-left-color: #5ea88d !important;
 }
 [data-theme="eye-care"] .bg-sky-50 {
   background-color: #e8e0d0 !important;
