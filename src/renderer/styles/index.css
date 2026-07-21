@@ -310,6 +310,9 @@ input, textarea {
 [data-theme="dark"] .hover\:bg-amber-600:hover {
   background-color: #b45309 !important;
 }
+[data-theme="dark"] .hover\:shadow-amber-200:hover {
+  --tw-shadow-color: rgba(217, 119, 6, 0.2) !important;
+}
 [data-theme="dark"] .text-amber-500 {
   color: #fbbf24 !important;
 }
