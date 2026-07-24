@@ -364,6 +364,7 @@ export default function PomodoroPanel({ todos }) {
                   ...activeTodos.map((t) => ({ value: t.id, label: t.text })),
                 ]}
                 placeholder="无关联任务"
+                dropUp
               />
             </div>
           )}

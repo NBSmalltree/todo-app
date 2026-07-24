@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-export default function CustomSelect({ value, onChange, options, placeholder, className }) {
+export default function CustomSelect({ value, onChange, options, placeholder, className, dropUp }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -39,7 +39,7 @@ export default function CustomSelect({ value, onChange, options, placeholder, cl
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full min-w-[140px] bg-white rounded-lg shadow-lg border border-gray-200 py-1 max-h-48 overflow-auto">
+        <div className={`absolute z-50 w-full min-w-[140px] bg-white rounded-lg shadow-lg border border-gray-200 py-1 max-h-48 overflow-auto ${dropUp ? 'bottom-full mb-1' : 'mt-1'}`}>
           {options.map((opt) => (
             <button
               key={opt.value}
