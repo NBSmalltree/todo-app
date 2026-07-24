@@ -16,7 +16,7 @@ fn is_non_empty_string(v: &Value, max_len: usize) -> bool {
     })
 }
 
-async fn broadcast_pomodoro_state(handle: &tauri::AppHandle) {
+pub async fn broadcast_pomodoro_state(handle: &tauri::AppHandle) {
     let state = handle.state::<AppState>();
     let snapshot = state.pomodoro.get_snapshot().await;
     
@@ -742,60 +742,86 @@ pub async fn pomodoro_stop(app: tauri::AppHandle, state: State<'_, AppState>) ->
     Ok(json!({ "success": true }))
 }
 
-#[tauri::command]
-pub async fn pomodoro_complete(
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
-    actual_duration: i64,
-    task_text: Option<String>,
-) -> Result<Value, String> {
-    // Record completed session
-    let (session_id, cycles_completed, current_task_id) = {
+/// Records the current pomodoro cycle as completed and transitions to the next state:
+/// - focus → auto-start a short/long break
+/// - break → go idle
+/// This is called both by the backend tick loop and by the manual `pomodoro_complete` command.
+pub async fn complete_and_transition_pomodoro(app: &tauri::AppHandle) -> Result<(), String> {
+    // Gather pomodoro state in one short-lived scope.
+    let (session_id, was_focus, current_task_id, task_text, cycles_completed) = {
+        let state = app.state::<AppState>();
         let inner = state.pomodoro.get_inner().await;
-        (inner.session_id, inner.cycles_completed, inner.task_id)
+        (
+            inner.session_id,
+            inner.cycle_type == "focus",
+            inner.task_id,
+            inner.task_text.clone(),
+            inner.cycles_completed,
+        )
     };
+
+    // Record completed session
     if let Some(sid) = session_id {
         let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let _ = state.db.lock().update_pomodoro_session(sid, Some(&now), Some(actual_duration), Some(1));
+        let actual_duration = {
+            let state = app.state::<AppState>();
+            let inner = state.pomodoro.get_inner().await;
+            inner.actual_elapsed_secs()
+        };
+        let state = app.state::<AppState>();
+        let _ = state.db.lock().update_pomodoro_session(
+            sid, Some(&now), actual_duration, Some(1)
+        );
     }
 
-    // Auto-start break if this was a focus session
-    let was_focus = {
-        let inner = state.pomodoro.get_inner().await;
-        inner.cycle_type == "focus"
-    };
-
     if was_focus {
-        let (break_dur, break_type) = {
+        // Decide break length and create the break session in a scoped block so
+        // the DB lock is released before we start the break in pomodoro state.
+        let (break_dur, break_type, break_session) = {
+            let state = app.state::<AppState>();
             let settings = state.db.lock().get_settings_map().unwrap_or_default();
             let before_long = settings.get("pomodoro_cycles_before_long")
                 .and_then(|v| v.as_i64()).unwrap_or(4);
-            // cycles_completed was already incremented by the frontend flow
-            let total = cycles_completed + 1;
-            if total % before_long == 0 {
+            // cycles_completed was already incremented by InnerState::tick()
+            let (break_dur, break_type) = if cycles_completed % before_long == 0 {
                 (settings.get("pomodoro_long_break").and_then(|v| v.as_i64()).unwrap_or(15) * 60,
                  "long_break".to_string())
             } else {
                 (settings.get("pomodoro_short_break").and_then(|v| v.as_i64()).unwrap_or(5) * 60,
                  "short_break".to_string())
-            }
+            };
+            let break_session = state.db.lock().add_pomodoro_session(
+                current_task_id, task_text.as_deref(), break_dur, &break_type,
+            ).ok();
+            (break_dur, break_type, break_session)
         };
 
-        let break_session = state.db.lock().add_pomodoro_session(
-            current_task_id, task_text.as_deref(), break_dur, &break_type,
-        ).ok();
-
         if let Some(s) = break_session {
+            let state = app.state::<AppState>();
             let mut inner = state.pomodoro.get_inner().await;
             inner.start_break(current_task_id, task_text, break_dur, break_type, s.id);
         }
     } else {
         // Break completed → go idle
+        let state = app.state::<AppState>();
         let mut inner = state.pomodoro.get_inner().await;
         inner.is_running = false;
     }
 
-    broadcast_pomodoro_state(&app).await;
+    broadcast_pomodoro_state(app).await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn pomodoro_complete(
+    app: tauri::AppHandle,
+    _state: State<'_, AppState>,
+    _actual_duration: i64,
+    _task_text: Option<String>,
+) -> Result<Value, String> {
+    // Natural completion is now driven by the backend tick loop. This command is kept for
+    // compatibility but immediately delegates to the same transition logic.
+    complete_and_transition_pomodoro(&app).await?;
     Ok(json!({ "success": true }))
 }
 

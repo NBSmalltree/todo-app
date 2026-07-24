@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+
 import api from '../api';
 import CustomSelect from './CustomSelect';
 
@@ -19,14 +20,7 @@ export default function PomodoroPanel({ todos }) {
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [isStarting, setIsStarting] = useState(false);
   const mountedRef = useRef(true);
-  const stateRef = useRef(state);
-  const intervalRef = useRef(null);
   const [theme, setTheme] = useState('light');
-
-  // Keep stateRef in sync
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
 
   // Detect theme
   useEffect(() => {
@@ -36,100 +30,28 @@ export default function PomodoroPanel({ todos }) {
     return () => { if (unlisten) unlisten(); };
   }, []);
 
-  // Load initial state on mount
-  const loadState = async () => {
+  // Sync local state with the backend source of truth.
+  const loadState = useCallback(async () => {
     try {
       const s = await api.pomodoroGetState();
       if (mountedRef.current) setState(s);
     } catch { /* ignore */ }
-  };
+  }, []);
 
+  // Load initial state on mount and subscribe to backend broadcasts.
+  // The backend now drives the countdown and emits state every second.
   useEffect(() => {
     loadState();
     let unlistenRef = null;
     api.onPomodoroStateChanged?.((newState) => {
-      if (mountedRef.current) {
-        setState(prev => {
-          // During countdown, backend's timeRemaining is stale (never decrements).
-          // Only preserve frontend's timeRemaining when the cycle hasn't changed.
-          // When cycleType changes (e.g. focus→break), use the new duration from backend.
-          if (prev.isRunning && newState.cycleType === prev.cycleType) {
-            return { ...newState, timeRemaining: prev.timeRemaining };
-          }
-          return newState;
-        });
-      }
+      if (mountedRef.current) setState(newState);
     }).then(fn => { if (fn) unlistenRef = fn; });
 
     return () => {
       mountedRef.current = false;
       if (unlistenRef) unlistenRef();
     };
-  }, []);
-
-  // Frontend-driven countdown timer
-  const stopFrontendTimer = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }, []);
-
-  const handleComplete = useCallback(async () => {
-    stopFrontendTimer();
-    const s = stateRef.current;
-    try {
-      await api.pomodoroComplete({
-        actualDuration: s.totalDuration,
-        taskText: s.taskText,
-      });
-    } catch (e) {
-      console.error('Failed to complete pomodoro:', e);
-    }
-    // Reload state from backend (now in break or idle)
-    loadState();
-  }, [stopFrontendTimer]);
-
-  useEffect(() => {
-    stopFrontendTimer();
-
-    if (!state.isRunning || state.isPaused) return;
-    // Defensive: treat timeRemaining ≤ 0 as a stale/phantom session — auto-complete
-    if (state.timeRemaining <= 0) {
-      console.warn('Pomodoro in running state with timeRemaining <= 0 — treating as stale, completing');
-      handleComplete();
-      return;
-    }
-
-    // Start a 1-second countdown that only touches React state
-    let tickCount = 0;
-    intervalRef.current = setInterval(() => {
-      tickCount++;
-      if (!mountedRef.current) return;
-      const s = stateRef.current;
-      if (!s.isRunning || s.isPaused) {
-        stopFrontendTimer();
-        return;
-      }
-      // Re-check every 5 ticks to catch stale state from races
-      if (tickCount % 5 === 0 && s.timeRemaining <= 0) {
-        console.warn('Pomodoro countdown detected timeRemaining <= 0 at tick', tickCount);
-        stopFrontendTimer();
-        setState(prev => ({ ...prev, timeRemaining: 0 }));
-        handleComplete();
-        return;
-      }
-      if (s.timeRemaining <= 1) {
-        // Timer done — complete via backend
-        setState(prev => ({ ...prev, timeRemaining: 0 }));
-        handleComplete();
-        return;
-      }
-      setState(prev => ({ ...prev, timeRemaining: prev.timeRemaining - 1 }));
-    }, 1000);
-
-    return stopFrontendTimer;
-  }, [state.isRunning, state.isPaused, stopFrontendTimer, handleComplete]);
+  }, [loadState]);
 
   // Format seconds to MM:SS
   const formatTime = (seconds) => {
@@ -175,7 +97,6 @@ export default function PomodoroPanel({ todos }) {
         // Backend holds a stale session — clean it up and let user retry manually
         console.warn('Pomodoro start rejected, cleaning up stale session:', result.error);
         await api.pomodoroStop();
-        stopFrontendTimer();
       }
       // Always sync state with backend after any operation
       loadState();
@@ -217,12 +138,10 @@ export default function PomodoroPanel({ todos }) {
   };
   const handleStop = async () => {
     try {
-      stopFrontendTimer();
       await api.pomodoroStop();
     } catch (e) {
       console.error('Stop failed:', e);
     } finally {
-      stopFrontendTimer();
       loadState();
     }
   };

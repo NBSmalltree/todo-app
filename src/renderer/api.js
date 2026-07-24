@@ -78,10 +78,6 @@ const api = {
   pomodoroPause: () => invoke('pomodoro_pause'),
   pomodoroResume: () => invoke('pomodoro_resume'),
   pomodoroStop: () => invoke('pomodoro_stop'),
-  pomodoroComplete: (data) => invoke('pomodoro_complete', {
-    actualDuration: data.actualDuration,
-    taskText: data.taskText || null,
-  }),
   pomodoroGetSessions: () => invoke('pomodoro_get_sessions'),
   pomodoroGetStats: (period) => invoke('pomodoro_get_stats', { period }),
 

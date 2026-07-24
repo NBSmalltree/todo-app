@@ -165,6 +165,7 @@ pub fn run() {
             }
 
             start_reminder_polling(app.handle());
+            start_pomodoro_ticking(app.handle());
 
             // Restore window position from previous session
             if let Some(float_win) = app.get_webview_window("float") {
@@ -325,6 +326,35 @@ fn start_reminder_polling(handle: &tauri::AppHandle) {
                     .body(&body)
                     .show();
             }
+        }
+    });
+}
+
+fn start_pomodoro_ticking(handle: &tauri::AppHandle) {
+    let handle = handle.clone();
+    tauri::async_runtime::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
+        interval.tick().await; // skip first immediate tick
+
+        loop {
+            interval.tick().await;
+
+            let tick_result = {
+                let state = handle.state::<AppState>();
+                let mut inner = state.pomodoro.get_inner().await;
+                inner.tick()
+            };
+
+            if let Some(result) = tick_result {
+                if result.completed {
+                    if let Err(e) = commands::complete_and_transition_pomodoro(&handle).await {
+                        eprintln!("[Pomodoro] Failed to transition after tick: {}", e);
+                    }
+                    continue; // state already broadcast by transition helper
+                }
+            }
+
+            commands::broadcast_pomodoro_state(&handle).await;
         }
     });
 }

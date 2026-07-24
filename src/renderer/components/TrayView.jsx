@@ -52,6 +52,15 @@ export default function TrayView() {
       document.documentElement.setAttribute('data-theme', newTheme);
     }).then(fn => { if (fn) unlisteners.push(fn); });
 
+    // Load initial pomodoro state so the banner appears immediately if a timer is running
+    const loadPomodoroState = async () => {
+      try {
+        const state = await api.pomodoroGetState();
+        setPomodoroState(state);
+      } catch (e) { /* ignore */ }
+    };
+    loadPomodoroState();
+
     // Listen for pomodoro state changes
     api.onPomodoroStateChanged?.((state) => {
       setPomodoroState(state);

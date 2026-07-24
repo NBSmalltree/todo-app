@@ -136,7 +136,7 @@ impl InnerState {
     }
 
     /// Compute actual (non-paused) elapsed time in seconds.
-    fn actual_elapsed_secs(&self) -> Option<i64> {
+    pub fn actual_elapsed_secs(&self) -> Option<i64> {
         self.start_time.map(|t| {
             let now = chrono::Utc::now().timestamp_millis();
             let paused_ms = if self.is_paused {
