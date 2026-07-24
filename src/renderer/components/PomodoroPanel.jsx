@@ -145,16 +145,16 @@ export default function PomodoroPanel({ todos }) {
 
   // Determine colors based on cycle type
   const isFocus = state.cycleType === 'focus';
-  const accentColor = isFocus ? 'text-rose-500' : 'text-emerald-500';
   const bgColor = isFocus ? 'bg-rose-50' : 'bg-emerald-50';
   const borderColor = isFocus ? 'border-rose-200' : 'border-emerald-200';
   const cycleLabel = isFocus ? '专注' : state.cycleType === 'short_break' ? '短休息' : '长休息';
 
-  // SVG ring colors by theme
+  // SVG ring colors by theme — raised contrast so the timer stays readable
+  // across light / dark / eye-care modes and against window transparency.
   const svgColors = {
-    focus: { light: '#f43f5e', dark: '#f06e88', 'eye-care': '#c47a6b' },
-    break: { light: '#10b981', dark: '#3ec480', 'eye-care': '#6ea88d' },
-    track: { light: '#f1f5f9', dark: '#2b2330', 'eye-care': '#e8e0d0' },
+    focus: { light: '#e11d48', dark: '#fb7185', 'eye-care': '#b35f4e' },
+    break: { light: '#059669', dark: '#34d399', 'eye-care': '#4e8a72' },
+    track: { light: '#e2e8f0', dark: '#33263a', 'eye-care': '#d9d0c0' },
   };
   const countingColor = svgColors[isFocus ? 'focus' : 'break'][theme] || svgColors.focus.light;
   const trackColor = svgColors.track[theme] || svgColors.track.light;
@@ -239,7 +239,7 @@ export default function PomodoroPanel({ todos }) {
       expanded ? borderColor + ' ' + bgColor :
       state.isRunning ? borderColor + ' ' + bgColor :
       'border-gray-200 hover:border-gray-300'
-    } ${state.isRunning && !expanded ? 'border-l-2 ' + (isFocus ? 'border-l-rose-400' : 'border-l-emerald-400') : ''}`}>
+    } ${state.isRunning && !expanded ? 'border-l-[3px] ' + (isFocus ? 'border-l-rose-500' : 'border-l-emerald-500') : ''}`}>
       {/* Collapsed header bar — always toggleable */}
       <button
         type="button"
@@ -253,12 +253,12 @@ export default function PomodoroPanel({ todos }) {
         <span className={`text-base transition-transform duration-300 ${state.isRunning ? 'animate-pulse-soft' : ''}`}>🍅</span>
         <span className="text-sm font-medium text-gray-700 transition-colors duration-200">番茄钟</span>
         {state.isRunning && (
-          <span className={`text-sm font-bold tabular-nums transition-all duration-300 ${accentColor}`}>
+          <span className="text-sm font-bold tabular-nums transition-all duration-300" style={{ color: countingColor }}>
             {formatTime(state.timeRemaining)}{state.isPaused ? ' 暂停' : ''}
           </span>
         )}
         {state.isRunning && state.taskText && (
-          <span className="text-[10px] text-gray-400 truncate flex-1">{state.taskText}</span>
+          <span className="text-[10px] text-gray-500 truncate flex-1">{state.taskText}</span>
         )}
         {state.cyclesCompleted > 0 && !state.isRunning && (
           <span className="text-xs text-gray-400">完成 {state.cyclesCompleted} 个</span>
@@ -332,17 +332,20 @@ export default function PomodoroPanel({ todos }) {
 
             {/* Cycle indicators */}
             <div className="flex items-center gap-1.5">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-2 h-2 rounded-full transition-all duration-500 ${
-                    i < state.cyclesCompleted % 4
-                      ? (isFocus ? 'bg-rose-400 scale-110' : 'bg-emerald-400 scale-110')
-                      : 'bg-gray-200'
-                  }`}
-                />
-              ))}
-              <span className="text-[10px] text-gray-400 ml-1 transition-opacity duration-300">
+              {Array.from({ length: 4 }).map((_, i) => {
+                const completed = i < state.cyclesCompleted % 4;
+                return (
+                  <div
+                    key={i}
+                    className={`w-2 h-2 rounded-full transition-all duration-500 ${
+                      completed
+                        ? (isFocus ? 'bg-rose-500 scale-125' : 'bg-emerald-500 scale-125')
+                        : 'border border-gray-300 bg-transparent scale-100'
+                    }`}
+                  />
+                );
+              })}
+              <span className="text-[10px] text-gray-500 ml-1 transition-opacity duration-300">
                 第 {state.cyclesCompleted + 1} 轮
               </span>
             </div>

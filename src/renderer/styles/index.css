@@ -379,8 +379,9 @@ input, textarea {
 [data-theme="dark"] .border-rose-200 {
   border-color: #362130 !important;
 }
-[data-theme="dark"] .border-l-rose-400 {
-  border-left-color: #c47588 !important;
+[data-theme="dark"] .border-l-rose-400,
+[data-theme="dark"] .border-l-rose-500 {
+  border-left-color: #fb7185 !important;
 }
 
 [data-theme="dark"] .bg-emerald-50 {
@@ -394,8 +395,9 @@ input, textarea {
 [data-theme="dark"] .border-emerald-200 {
   border-color: #133c30 !important;
 }
-[data-theme="dark"] .border-l-emerald-400 {
-  border-left-color: #5abf88 !important;
+[data-theme="dark"] .border-l-emerald-400,
+[data-theme="dark"] .border-l-emerald-500 {
+  border-left-color: #34d399 !important;
 }
 
 /* Stat card number text (sky-blue headings) */
@@ -525,9 +527,11 @@ input, textarea {
   color: #7d6e5e !important;
 }
 
-[data-theme="eye-care"] .text-gray-500,
 [data-theme="eye-care"] .text-gray-400 {
   color: #9a8b78 !important;
+}
+[data-theme="eye-care"] .text-gray-500 {
+  color: #7d6e5e !important;
 }
 
 [data-theme="eye-care"] .border-gray-100,
@@ -585,8 +589,9 @@ input, textarea {
 [data-theme="eye-care"] .border-rose-200 {
   border-color: #e0cec0 !important;
 }
-[data-theme="eye-care"] .border-l-rose-400 {
-  border-left-color: #b87a6e !important;
+[data-theme="eye-care"] .border-l-rose-400,
+[data-theme="eye-care"] .border-l-rose-500 {
+  border-left-color: #b35f4e !important;
 }
 [data-theme="eye-care"] .bg-emerald-50 {
   background-color: #e0efe5 !important;
@@ -599,8 +604,9 @@ input, textarea {
 [data-theme="eye-care"] .border-emerald-200 {
   border-color: #c8dcc8 !important;
 }
-[data-theme="eye-care"] .border-l-emerald-400 {
-  border-left-color: #5ea88d !important;
+[data-theme="eye-care"] .border-l-emerald-400,
+[data-theme="eye-care"] .border-l-emerald-500 {
+  border-left-color: #4e8a72 !important;
 }
 [data-theme="eye-care"] .bg-sky-50 {
   background-color: #e8e0d0 !important;
