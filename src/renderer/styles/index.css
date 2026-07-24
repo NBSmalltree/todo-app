@@ -365,7 +365,7 @@ input, textarea {
 }
 
 [data-theme="dark"] .bg-rose-50 {
-  background-color: #2b1626 !important;
+  background-color: #262025 !important;
 }
 [data-theme="dark"] .text-rose-400,
 [data-theme="dark"] .text-rose-500 {
@@ -377,7 +377,7 @@ input, textarea {
 }
 [data-theme="dark"] .border-rose-100,
 [data-theme="dark"] .border-rose-200 {
-  border-color: #362130 !important;
+  border-color: #30272b !important;
 }
 [data-theme="dark"] .border-l-rose-400,
 [data-theme="dark"] .border-l-rose-500 {
@@ -385,7 +385,7 @@ input, textarea {
 }
 
 [data-theme="dark"] .bg-emerald-50 {
-  background-color: #0d3026 !important;
+  background-color: #1a2624 !important;
 }
 [data-theme="dark"] .text-emerald-500,
 [data-theme="dark"] .text-emerald-600 {
@@ -393,7 +393,7 @@ input, textarea {
 }
 [data-theme="dark"] .border-emerald-100,
 [data-theme="dark"] .border-emerald-200 {
-  border-color: #133c30 !important;
+  border-color: #26332e !important;
 }
 [data-theme="dark"] .border-l-emerald-400,
 [data-theme="dark"] .border-l-emerald-500 {
