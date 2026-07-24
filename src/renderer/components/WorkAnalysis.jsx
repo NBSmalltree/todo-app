@@ -79,7 +79,16 @@ export default function WorkAnalysis() {
     try {
       const stats = await api.pomodoroGetStats(period);
       setPomodoroStats(stats);
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      console.error('Failed to load pomodoro stats:', e);
+      setPomodoroStats({
+        totalSessions: 0,
+        totalFocusMinutes: 0,
+        todaySessions: 0,
+        dailyBreakdown: [],
+        recentSessions: [],
+      });
+    }
     setPomodoroLoading(false);
   };
 
@@ -207,7 +216,7 @@ export default function WorkAnalysis() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="text-2xl font-bold text-sky-600">{completionRate}%</div>
-          <div className="text-sm text-gray-500 mt-1">完成率</div>
+          <div className="text-sm text-gray-500 mt-1">归档率</div>
         </div>
       </div>
 
@@ -341,16 +350,26 @@ export default function WorkAnalysis() {
                 <div>
                   <h4 className="text-[11px] font-medium text-rose-600 mb-2">最近记录</h4>
                   <div className="space-y-1 max-h-[150px] overflow-y-auto">
-                    {pomodoroStats.recentSessions.map((s) => (
-                      <div key={s.id} className="flex items-center gap-2 text-[11px]">
-                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.completed ? 'bg-rose-400' : 'bg-gray-300'}`} />
-                        <span className="text-rose-500 w-20 flex-shrink-0 whitespace-nowrap">{s.dateLabel}</span>
-                        <span className={`flex-1 truncate ${s.completed ? 'text-rose-700' : 'text-gray-400'}`}>
-                          {s.task_text || (s.cycle_type === 'focus' ? '专注' : s.cycle_type)}
-                        </span>
-                        <span className="text-gray-400 w-8 text-right flex-shrink-0">{Math.round((s.actual_duration || 0) / 60)}分</span>
-                      </div>
-                    ))}
+                    {pomodoroStats.recentSessions.map((s) => {
+                      const seconds = s.actual_duration || 0;
+                      const durationText = seconds < 60
+                        ? `${seconds}秒`
+                        : `${Math.round(seconds / 60)}分`;
+                      const cycleLabel = s.cycle_type === 'focus' ? '专注'
+                        : s.cycle_type === 'short_break' ? '短休息'
+                        : s.cycle_type === 'long_break' ? '长休息'
+                        : s.cycle_type;
+                      return (
+                        <div key={s.id} className="flex items-center gap-2 text-[11px]">
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-rose-400" />
+                          <span className="text-rose-500 w-20 flex-shrink-0 whitespace-nowrap">{s.dateLabel}</span>
+                          <span className="flex-1 truncate text-rose-700">
+                            {s.task_text || cycleLabel}
+                          </span>
+                          <span className="text-gray-400 w-10 text-right flex-shrink-0">{durationText}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

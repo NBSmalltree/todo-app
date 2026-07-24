@@ -64,7 +64,7 @@ pub struct PomodoroStats {
     pub total_focus_minutes: i64,
     pub today_sessions: i64,
     pub daily_breakdown: Vec<serde_json::Value>,
-    pub recent_sessions: Vec<PomodoroSession>,
+    pub recent_sessions: Vec<serde_json::Value>,
 }
 
 pub struct Database {
@@ -728,7 +728,41 @@ impl Database {
             Ok(serde_json::json!({"date": &day[5..], "count": count}))
         })?.filter_map(|r| r.ok()).collect();
 
-        let recent_sessions = self.get_pomodoro_sessions(10)?;
+        // Recent sessions: limit to the selected period, completed focus sessions only,
+        // so the list matches the summary stats and charts.
+        let mut recent_stmt = self.conn.prepare(
+            &format!(
+                "SELECT id, task_id, task_text, start_time, end_time, duration, actual_duration, cycle_type, completed, created_at \
+                 FROM pomodoro_sessions \
+                 WHERE completed = 1 AND cycle_type = 'focus' AND start_time >= datetime('now','localtime','-{} days') \
+                 ORDER BY start_time DESC LIMIT 10",
+                days
+            )
+        )?;
+        let recent_sessions: Vec<serde_json::Value> = recent_stmt.query_map([], |row| {
+            let start_time: Option<String> = row.get(3)?;
+            let date_label = start_time.as_ref().and_then(|t| {
+                // t is "YYYY-MM-DD HH:MM:SS"; produce "MM-DD HH:mm"
+                if t.len() >= 16 {
+                    Some(format!("{} {}", &t[5..10], &t[11..16]))
+                } else {
+                    None
+                }
+            });
+            Ok(serde_json::json!({
+                "id": row.get::<_, i64>(0)?,
+                "taskId": row.get::<_, Option<i64>>(1)?,
+                "taskText": row.get::<_, Option<String>>(2)?,
+                "startTime": start_time,
+                "endTime": row.get::<_, Option<String>>(4)?,
+                "duration": row.get::<_, Option<i64>>(5)?,
+                "actualDuration": row.get::<_, Option<i64>>(6)?,
+                "cycleType": row.get::<_, Option<String>>(7)?,
+                "completed": row.get::<_, i64>(8)?,
+                "createdAt": row.get::<_, Option<String>>(9)?,
+                "dateLabel": date_label,
+            }))
+        })?.filter_map(|r| r.ok()).collect();
 
         Ok(PomodoroStats {
             total_sessions, total_focus_minutes, today_sessions,
