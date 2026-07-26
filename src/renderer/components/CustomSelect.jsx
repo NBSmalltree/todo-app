@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+import { useI18n } from '../i18n';
+
 export default function CustomSelect({ value, onChange, options, placeholder, className, dropUp }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -13,7 +16,7 @@ export default function CustomSelect({ value, onChange, options, placeholder, cl
   }, []);
 
   const selected = options.find((o) => o.value === value);
-  const label = selected ? selected.label : placeholder || '请选择';
+  const label = selected ? selected.label : placeholder || t('customSelect.placeholder');
   const isPlaceholder = value === '' || value === null || value === undefined;
 
   return (
