@@ -49,7 +49,7 @@ export default function QuickAdd() {
         <div className="flex items-center gap-2 bg-white rounded-xl shadow-lg border border-gray-200 px-4 py-2.5 relative">
           <button onClick={doClose}
             className="absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded-full bg-white hover:bg-red-50 text-gray-300 hover:text-red-500 shadow border border-gray-200 transition-all"
-            title={t('quickAdd.closeTooltip')}
+            title={t('quickAdd.close')}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -66,7 +66,7 @@ export default function QuickAdd() {
           />
           {text && (
             <button onClick={() => { setText(''); inputRef.current?.focus(); }}
-              className="text-gray-400 hover:text-gray-600 transition-colors shrink-0" title={t('quickAdd.clearTooltip')}
+              className="text-gray-400 hover:text-gray-600 transition-colors shrink-0" title={t('quickAdd.clear')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />

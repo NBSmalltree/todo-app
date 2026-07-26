@@ -262,7 +262,7 @@ export default function ArchiveViewer() {
               onClick={undoToast.undoAction}
               className="font-medium text-sky-300 hover:text-sky-200 transition-colors"
             >
-              {t('archive.undo')}
+              {t('common.undo')}
             </button>
           </div>
         </div>
@@ -273,7 +273,7 @@ export default function ArchiveViewer() {
         <div className="flex flex-wrap gap-3 items-end">
           {/* Search */}
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs text-gray-500 mb-1">{t('archive.search')}</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('common.search')}</label>
             <input
               type="text"
               ref={searchInputRef}
@@ -291,7 +291,7 @@ export default function ArchiveViewer() {
               value={filters.category}
               onChange={(val) => handleFilterChange('category', val)}
               options={[
-                { value: 'all', label: t('archive.categoryAll') },
+                { value: 'all', label: t('archive.category.all') },
                 ...categories.map((cat) => ({ value: cat, label: cat })),
               ]}
             />
@@ -323,7 +323,7 @@ export default function ArchiveViewer() {
             onClick={handleClearFilters}
             className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
-            {t('archive.reset')}
+            {t('common.reset')}
           </button>
 
           {/* Select Mode Toggle */}
@@ -338,7 +338,7 @@ export default function ArchiveViewer() {
                 : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
             }`}
           >
-            {selectMode ? t('archive.cancel') : t('archive.select')}
+            {selectMode ? t('common.cancel') : t('common.select')}
           </button>
 
           {/* Export */}
@@ -347,9 +347,9 @@ export default function ArchiveViewer() {
               value={exportType}
               onChange={(val) => setExportType(val)}
               options={[
-                { value: 'archived', label: t('archive.exportTypeArchived') },
-                { value: 'active', label: t('archive.exportTypeActive') },
-                { value: 'all', label: t('archive.exportTypeAll') },
+                { value: 'archived', label: t('archive.exportType.archived') },
+                { value: 'active', label: t('archive.exportType.active') },
+                { value: 'all', label: t('archive.exportType.all') },
               ]}
             />
             <button
@@ -380,7 +380,7 @@ export default function ArchiveViewer() {
               className="w-4 h-4 rounded border-gray-300 text-sky-500 focus:ring-sky-200 cursor-pointer"
             />
             <span className="text-xs text-sky-700 font-medium">
-              {selectedIds.size > 0 ? t('archive.selectedCount', { count: selectedIds.size }) : t('archive.selectAll')}
+              {selectedIds.size > 0 ? t('common.selectedCount', { count: selectedIds.size }) : t('common.selectAll')}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -458,22 +458,22 @@ export default function ArchiveViewer() {
                     </th>
                   )}
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t('archive.headerTaskContent')}
+                    {t('archive.header.taskContent')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t('archive.headerDueDate')}
+                    {t('archive.header.dueDate')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t('archive.headerCategory')}
+                    {t('archive.header.category')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t('archive.headerNote')}
+                    {t('archive.header.note')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t('archive.headerArchivedAt')}
+                    {t('archive.header.archivedAt')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t('archive.headerActions')}
+                    {t('archive.header.actions')}
                   </th>
                 </tr>
               </thead>
@@ -519,7 +519,7 @@ export default function ArchiveViewer() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700">
-                        {item.category || t('archive.uncategorized')}
+                        {item.category || t('archive.category.uncategorized')}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -533,22 +533,22 @@ export default function ArchiveViewer() {
                             onBlur={() => handleSaveNote(item.id)}
                             autoFocus
                             className="flex-1 px-2 py-1 text-sm bg-gray-50 rounded border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
-                            placeholder={t('archive.notePlaceholder')}
+                            placeholder={t('archive.note.placeholder')}
                           />
                           <button
                             onClick={() => handleSaveNote(item.id)}
                             className="px-2 py-1 text-xs bg-sky-500 text-white rounded hover:bg-sky-600 transition-colors"
                           >
-                            {t('archive.save')}
+                            {t('common.save')}
                           </button>
                         </div>
                       ) : (
                         <span
                           onDoubleClick={() => handleNoteDoubleClick(item)}
                           className="text-sm text-gray-500 cursor-pointer hover:text-gray-700 transition-colors"
-                          title={t('archive.noteTitle')}
+                          title={t('archive.note.title')}
                         >
-                          {item.note || t('archive.noteEmpty')}
+                          {item.note || t('archive.note.empty')}
                         </span>
                       )}
                     </td>
@@ -584,7 +584,7 @@ export default function ArchiveViewer() {
                           className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded hover:bg-red-100 transition-colors"
                           title={t('archive.deleteTitle')}
                         >
-                          {t('archive.delete')}
+                          {t('common.delete')}
                         </button>
                       </div>
                     </td>

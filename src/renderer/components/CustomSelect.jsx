@@ -16,7 +16,7 @@ export default function CustomSelect({ value, onChange, options, placeholder, cl
   }, []);
 
   const selected = options.find((o) => o.value === value);
-  const label = selected ? selected.label : placeholder || t('customSelect.placeholder');
+  const label = selected ? selected.label : placeholder || t('common.pleaseSelect');
   const isPlaceholder = value === '' || value === null || value === undefined;
 
   return (

@@ -259,7 +259,7 @@ export default function TodoWindow() {
         return next;
       });
       await loadTodos();
-      showUndoToast(t('todoWindow.deletedMessage'), () => api.recoverTodo(id));
+      showUndoToast(t('todo.deleted'), () => api.recoverTodo(id));
     } catch (error) {
       console.error('Failed to delete todo:', error);
     }
@@ -269,7 +269,7 @@ export default function TodoWindow() {
     try {
       await api.archiveTodo(id);
       await loadTodos();
-      showUndoToast(t('todoWindow.archivedMessage'), () => api.restoreTodo(id));
+      showUndoToast(t('todo.archived'), () => api.restoreTodo(id));
     } catch (error) {
       console.error('Failed to archive todo:', error);
     }
@@ -356,10 +356,10 @@ export default function TodoWindow() {
 
   // Color options for urgency levels
   const COLOR_OPTIONS = [
-    { value: 'red',    label: t('todoWindow.priorityUrgent'), css: 'bg-red-400' },
-    { value: 'orange', label: t('todoWindow.priorityImportant'), css: 'bg-orange-400' },
-    { value: 'yellow', label: t('todoWindow.priorityNormal'), css: 'bg-yellow-400' },
-    { value: 'green',  label: t('todoWindow.priorityLow'), css: 'bg-green-400' },
+    { value: 'red',    label: t('todo.priority.urgent'), css: 'bg-red-400' },
+    { value: 'orange', label: t('todo.priority.important'), css: 'bg-orange-400' },
+    { value: 'yellow', label: t('todo.priority.normal'), css: 'bg-yellow-400' },
+    { value: 'green',  label: t('todo.priority.low'), css: 'bg-green-400' },
   ];
 
   const handleColorChange = async (id, color) => {
@@ -636,7 +636,7 @@ export default function TodoWindow() {
             <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="2" />
             <path d="M8 12l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <span className="text-sm font-medium text-gray-700">{t('todoWindow.title')}</span>
+          <span className="text-sm font-medium text-gray-700">{t('todo.title')}</span>
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -644,7 +644,7 @@ export default function TodoWindow() {
             className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
               showSearch ? 'bg-gray-100 text-sky-500' : 'hover:bg-gray-100 text-gray-400 hover:text-gray-600'
             }`}
-            title={t('todoWindow.searchTitle')}
+            title={t('todo.searchTitle')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
@@ -660,7 +660,7 @@ export default function TodoWindow() {
                 ? 'bg-gray-100 text-sky-500'
                 : 'hover:bg-gray-100 text-gray-400 hover:text-gray-600'
             }`}
-            title={selectMode ? t('todoWindow.selectModeCancel') : t('todoWindow.selectModeStart')}
+            title={selectMode ? t('todo.selectMode.cancel') : t('todo.selectMode.start')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -672,7 +672,7 @@ export default function TodoWindow() {
           <button
             onClick={handleOpenTray}
             className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-            title={t('todoWindow.historyTitle')}
+            title={t('todo.openHistory')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
@@ -693,10 +693,10 @@ export default function TodoWindow() {
       {/* Quick filter bar — always visible */}
       <div className="flex gap-0.5 px-3 py-1 border-b border-gray-50 bg-white">
         {[
-          { value: '', label: t('todoWindow.filterAll') },
-          { value: 'due_today', label: t('todoWindow.filterToday') },
-          { value: 'overdue', label: t('todoWindow.filterOverdue') },
-          { value: 'no_due', label: t('todoWindow.filterNoDue') },
+          { value: '', label: t('todo.filter.all') },
+          { value: 'due_today', label: t('todo.filter.today') },
+          { value: 'overdue', label: t('todo.filter.overdue') },
+          { value: 'no_due', label: t('todo.filter.noDueDate') },
         ].map((opt) => (
           <button
             key={opt.value}
@@ -711,7 +711,7 @@ export default function TodoWindow() {
           </button>
         ))}
         <span className="ml-auto text-[10px] text-gray-400 self-center">
-          {t('todoWindow.itemCount', { count: activeTodos.length })}
+          {t('todo.itemCount', { count: activeTodos.length })}
         </span>
       </div>
 
@@ -728,7 +728,7 @@ export default function TodoWindow() {
               type="text"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              placeholder={t('todoWindow.searchPlaceholder')}
+              placeholder={t('todo.searchPlaceholder')}
               className="w-full pl-7 pr-7 py-1 text-xs bg-gray-50 rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-sky-200 focus:border-sky-300 transition-all placeholder-gray-400"
             />
             {searchText && (
@@ -760,11 +760,11 @@ export default function TodoWindow() {
               );
             })}
             {[
-              { value: '', label: t('todoWindow.filterChipAny') },
-              { value: 'due_today', label: t('todoWindow.filterChipDueToday') },
-              { value: 'overdue', label: t('todoWindow.filterChipOverdue') },
-              { value: 'no_due', label: t('todoWindow.filterChipNoDue') },
-              { value: 'due_future', label: t('todoWindow.filterChipFuture') },
+              { value: '', label: t('todo.filter.any') },
+              { value: 'due_today', label: t('todo.filter.dueToday') },
+              { value: 'overdue', label: t('todo.filter.chipOverdue') },
+              { value: 'no_due', label: t('todo.filter.noDueDate') },
+              { value: 'due_future', label: t('todo.filter.future') },
             ].map((opt) => (
               <button
                 key={opt.value}
@@ -797,7 +797,7 @@ export default function TodoWindow() {
               className="w-4 h-4 rounded border-gray-300 text-sky-500 focus:ring-sky-200 cursor-pointer"
             />
             <span className="text-xs text-sky-700 font-medium">
-              {selectedIds.size > 0 ? t('todoWindow.selectedCount', { count: selectedIds.size }) : t('todoWindow.selectAll')}
+              {selectedIds.size > 0 ? t('common.selectedCount', { count: selectedIds.size }) : t('todo.selectAll')}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -809,7 +809,7 @@ export default function TodoWindow() {
                 }
                 setSelectedIds(new Set());
                 await loadTodos();
-                showUndoToast(t('todoWindow.batchDeletedMessage', { count: ids.length }), async () => {
+                showUndoToast(t('todo.batchDeleted', { count: ids.length }), async () => {
                   for (const id of ids) await api.recoverTodo(id);
                   await loadTodos();
                 });
@@ -817,7 +817,7 @@ export default function TodoWindow() {
               disabled={selectedIds.size === 0}
               className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {t('todoWindow.batchDelete')}
+              {t('todo.batchDelete')}
             </button>
             <button
               onClick={async () => {
@@ -833,7 +833,7 @@ export default function TodoWindow() {
               disabled={selectedIds.size === 0 || !completedTodos.some(t => selectedIds.has(t.id))}
               className="px-2 py-1 text-xs text-sky-600 bg-sky-50 rounded hover:bg-sky-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {t('todoWindow.batchArchive')}
+              {t('todo.batchArchive')}
             </button>
           </div>
         </div>
@@ -855,7 +855,7 @@ export default function TodoWindow() {
             onKeyDown={handleKeyDown}
             onCompositionStart={() => { isComposingRef.current = true; }}
             onCompositionEnd={() => { isComposingRef.current = false; }}
-            placeholder={t('todoWindow.addTaskPlaceholder')}
+            placeholder={t('todo.addTaskPlaceholder')}
             className="flex-1 px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all placeholder-gray-400"
           />
           <button
@@ -863,7 +863,7 @@ export default function TodoWindow() {
             disabled={!inputText.trim()}
             className="px-3 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {t('todoWindow.addButton')}
+            {t('todo.add')}
           </button>
         </div>
       </div>
@@ -918,7 +918,7 @@ export default function TodoWindow() {
                            'bg-green-400')
                         : 'bg-gray-200 group-hover:bg-gray-300'
                     }`}
-                    title={todo.color ? t('todoWindow.priorityTitle', { color: todo.color }) : t('todoWindow.priorityMark')}
+                    title={todo.color ? t('todo.priority.title', { color: todo.color }) : t('todo.priority.mark')}
                   />
                 </div>
               )}
@@ -971,7 +971,7 @@ export default function TodoWindow() {
                 <span
                   onDoubleClick={(e) => handleDoubleClick(e, todo)}
                   className="flex-1 text-[14px] font-medium text-gray-800 truncate cursor-default"
-                  title={t('todoWindow.doubleClickEdit')}
+                  title={t('todo.doubleClickEdit')}
                 >
                   {todo.text}
                 </span>
@@ -986,7 +986,7 @@ export default function TodoWindow() {
                       ? 'bg-red-100 text-red-600'
                       : 'bg-gray-100 text-gray-500'
                   }`}
-                  title={t('todoWindow.setDueDateTitle')}
+                  title={t('todo.dueDate.setTitle')}
                 >
                   {(() => {
                     const d = todo.due_date;
@@ -1003,7 +1003,7 @@ export default function TodoWindow() {
                   data-date-toggle={todo.id}
                   onClick={() => setDatePickerId(datePickerId === todo.id ? null : todo.id)}
                   className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-sky-50 text-gray-300 hover:text-sky-500 transition-all"
-                  title={todo.due_date ? t('todoWindow.editDueDate') : t('todoWindow.setDueDateTitle')}
+                  title={todo.due_date ? t('todo.dueDate.edit') : t('todo.dueDate.setTitle')}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -1028,7 +1028,7 @@ export default function TodoWindow() {
                       ? 'opacity-100 text-amber-500 hover:bg-amber-50'
                       : 'opacity-0 text-gray-300 hover:text-amber-400'
                   }`}
-                  title={todo.scheduled_date ? t('todoWindow.editScheduledDate') : t('todoWindow.setScheduledDateTitle')}
+                  title={todo.scheduled_date ? t('todo.scheduledDate.edit') : t('todo.scheduledDate.setTitle')}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -1049,7 +1049,7 @@ export default function TodoWindow() {
                       ? 'opacity-100 text-sky-500 hover:bg-sky-50'
                       : 'opacity-0 text-gray-300 hover:text-gray-500'
                   }`}
-                  title={t('todoWindow.subtasksTitle')}
+                  title={t('todo.subtasks.title')}
                 >
                   <svg
                     width="13" height="13" viewBox="0 0 24 24"
@@ -1127,7 +1127,7 @@ export default function TodoWindow() {
                     value={newSubtaskText[todo.id] || ''}
                     onChange={(e) => setNewSubtaskText((prev) => ({ ...prev, [todo.id]: e.target.value }))}
                     onKeyDown={(e) => handleSubtaskKeyDown(e, todo.id)}
-                    placeholder={t('todoWindow.addSubtaskPlaceholder')}
+                    placeholder={t('todo.subtasks.placeholder')}
                     className="flex-1 min-w-0 text-[11px] bg-transparent border-none outline-none placeholder-gray-300 text-gray-600"
                   />
                 </div>
@@ -1158,11 +1158,11 @@ export default function TodoWindow() {
                       onClick={() => handleSetScheduledDate(todo.id, null)}
                       className="text-[11px] text-red-400 hover:text-red-500 px-1.5"
                     >
-                      {t('todoWindow.clear')}
+                      {t('common.clear')}
                     </button>
                   )}
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1">{t('todoWindow.scheduledDateHint')}</p>
+                <p className="text-[10px] text-gray-400 mt-1">{t('todo.scheduledDate.hint')}</p>
               </div>
             )}
           </div>
@@ -1180,7 +1180,7 @@ export default function TodoWindow() {
                 <rect x="3" y="3" width="18" height="18" rx="3" />
                 <path d="M8 12l3 3 5-6" />
               </svg>
-              <span className="text-xs font-medium text-gray-500">{t('todoWindow.completedSection', { count: completedTodos.length })}</span>
+              <span className="text-xs font-medium text-gray-500">{t('todo.section.completed', { count: completedTodos.length })}</span>
               <svg
                 className={`w-3 h-3 ml-auto text-gray-400 transition-transform ${showCompleted ? 'rotate-180' : ''}`}
                 viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
@@ -1221,7 +1221,7 @@ export default function TodoWindow() {
                       <span
                         onDoubleClick={(e) => handleDoubleClick(e, todo)}
                         className="flex-1 text-[13px] text-gray-400 line-through truncate cursor-default"
-                        title={t('todoWindow.doubleClickEdit')}
+                        title={t('todo.doubleClickEdit')}
                       >
                         {todo.text}
                       </span>
@@ -1249,7 +1249,7 @@ export default function TodoWindow() {
               className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-amber-50/50 transition-colors rounded"
             >
               <span className="text-[10px]">📅</span>
-              <span className="text-xs font-medium text-amber-600">{t('todoWindow.futureSection', { count: futureTodos.length })}</span>
+              <span className="text-xs font-medium text-amber-600">{t('todo.section.future', { count: futureTodos.length })}</span>
               <svg
                 className={`w-3 h-3 ml-auto text-amber-400 transition-transform ${showFutureSection ? 'rotate-180' : ''}`}
                 viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
@@ -1271,7 +1271,7 @@ export default function TodoWindow() {
                         handleSetScheduledDate(ft.id, null);
                       }}
                       className="opacity-0 group-hover:opacity-100 w-4 h-4 flex items-center justify-center rounded hover:bg-amber-50 text-gray-300 hover:text-amber-500 transition-all"
-                      title={t('todoWindow.removeScheduledDate')}
+                      title={t('todo.scheduledDate.remove')}
                     >
                       <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <path d="M18 6L6 18M6 6l12 12" />
@@ -1291,7 +1291,7 @@ export default function TodoWindow() {
               <rect x="3" y="3" width="18" height="18" rx="3" />
               <path d="M8 12l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="text-sm mt-2">{t('todoWindow.emptyState')}</span>
+            <span className="text-sm mt-2">{t('todo.emptyHint')}</span>
           </div>
         )}
       </div>
@@ -1304,16 +1304,16 @@ export default function TodoWindow() {
             onClick={undoToast.undoAction}
             className="ml-auto font-medium text-sky-300 hover:text-sky-200 transition-colors"
           >
-            {t('todoWindow.undo')}
+            {t('common.undo')}
           </button>
         </div>
       )}
 
       {/* Footer with count */}
       <div className="px-3 py-1 bg-gray-50/50 border-t border-gray-100 text-[10px] text-gray-400 flex items-center gap-2">
-        <span>{t('todoWindow.activeFooter', { count: activeTodos.length })}</span>
+        <span>{t('todo.footer.active', { count: activeTodos.length })}</span>
         <span className="text-gray-300">·</span>
-        <span>{t('todoWindow.completedFooter', { count: completedTodos.length })}</span>
+        <span>{t('todo.footer.completed', { count: completedTodos.length })}</span>
       </div>
 
       {/* Context Menu */}
@@ -1338,7 +1338,7 @@ export default function TodoWindow() {
               ))}
               {contextMenu.todo.color && (
                 <button
-                  title={t('todoWindow.clearColor')}
+                  title={t('todo.contextMenu.clearColor')}
                   className="w-5 h-5 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-gray-400 transition-colors"
                   onClick={() => {
                     handleColorChange(contextMenu.todo.id, null);
@@ -1360,7 +1360,7 @@ export default function TodoWindow() {
                 setContextMenu(null);
               }}
             >
-              {t('todoWindow.restoreTodo')}
+              {t('todo.contextMenu.restore')}
             </button>
           ) : (
             <button
@@ -1370,7 +1370,7 @@ export default function TodoWindow() {
                 setContextMenu(null);
               }}
             >
-              {t('todoWindow.markCompleted')}
+              {t('todo.contextMenu.markCompleted')}
             </button>
           )}
           {contextMenu.todo.completed ? (
@@ -1381,7 +1381,7 @@ export default function TodoWindow() {
                 setContextMenu(null);
               }}
             >
-              {t('todoWindow.archive')}
+              {t('todo.contextMenu.archive')}
             </button>
           ) : null}
           <div className="h-px bg-gray-100 my-1" />
@@ -1392,7 +1392,7 @@ export default function TodoWindow() {
               setContextMenu(null);
             }}
           >
-            {t('todoWindow.delete')}
+            {t('common.delete')}
           </button>
         </div>
       )}
