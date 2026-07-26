@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 import api from '../api';
+import { useI18n } from '../i18n';
 
 const THEMES = [
   { id: 'light', label: '浅色模式', icon: 'sun' },
@@ -58,6 +59,8 @@ export default function Settings() {
   const [shortcutToggle, setShortcutToggle] = useState('');
   const [shortcutQuickAdd, setShortcutQuickAdd] = useState('');
   const [recording, setRecording] = useState(null); // 'toggle' | 'quickadd' | null
+
+  const { locale, setLocale, supportedLocales } = useI18n();
 
   useEffect(() => {
     loadSettings();
@@ -345,6 +348,23 @@ export default function Settings() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-400 mt-1">仅影响待办清单悬浮窗口的透明度</p>
+              </div>
+
+              {/* Language Select */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  显示语言
+                </label>
+                <select
+                  value={locale}
+                  onChange={(e) => setLocale(e.target.value)}
+                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
+                >
+                  {Object.entries(supportedLocales).map(([code, label]) => (
+                    <option key={code} value={code}>{label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">选择界面显示语言</p>
               </div>
             </div>
           </div>
