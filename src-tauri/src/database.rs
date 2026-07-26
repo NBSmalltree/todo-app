@@ -72,6 +72,14 @@ pub struct Database {
     db_path: PathBuf,
 }
 
+/// Return `en` when the locale is "en-US", otherwise default to Chinese (`zh`).
+fn locale_text<'a>(locale: Option<&'a str>, zh: &'a str, en: &'a str) -> &'a str {
+    match locale {
+        Some("en-US") => en,
+        _ => zh,
+    }
+}
+
 impl Database {
     pub fn new(handle: &tauri::AppHandle) -> Result<Self, Box<dyn std::error::Error>> {
         let app_data = handle.path().app_data_dir()?;
@@ -574,7 +582,7 @@ impl Database {
 
     // ===== Work Analysis =====
 
-    pub fn get_work_analysis(&self, period: &str) -> Result<WorkAnalysisData, rusqlite::Error> {
+    pub fn get_work_analysis(&self, period: &str, locale: Option<&str>) -> Result<WorkAnalysisData, rusqlite::Error> {
         let days_ago = match period {
             "week" => 7, "month" => 30, "year" => 365, _ => 7,
         };
@@ -599,9 +607,10 @@ impl Database {
             "SELECT COUNT(*) FROM todos WHERE archived = 0 AND completed = 0 AND deleted = 0", [], |r| r.get(0),
         )?;
 
+        let default_category = locale_text(locale, "未分类", "Uncategorized").to_string();
         let mut cat_map = serde_json::Map::new();
         for item in &items {
-            let cat = item.category.clone().unwrap_or_else(|| "未分类".to_string());
+            let cat = item.category.clone().unwrap_or_else(|| default_category.clone());
             let entry = cat_map.entry(cat).or_insert_with(|| serde_json::json!({"count": 0, "items": []}));
             entry["count"] = serde_json::json!(entry["count"].as_i64().unwrap_or(0) + 1);
         }
