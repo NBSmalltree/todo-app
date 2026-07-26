@@ -4,9 +4,9 @@ import api from '../api';
 import { useI18n } from '../i18n';
 
 const THEMES = [
-  { id: 'light', label: '浅色模式', icon: 'sun' },
-  { id: 'dark', label: '深色模式', icon: 'moon' },
-  { id: 'eye-care', label: '护眼模式', icon: 'eye' },
+  { id: 'light', icon: 'sun' },
+  { id: 'dark', icon: 'moon' },
+  { id: 'eye-care', icon: 'eye' },
 ];
 
 function ThemeIcon({ type }) {
@@ -51,6 +51,7 @@ export default function Settings() {
   const [remindMinutes, setRemindMinutes] = useState(15);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [saveStatus, setSaveStatus] = useState(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
@@ -60,7 +61,7 @@ export default function Settings() {
   const [shortcutQuickAdd, setShortcutQuickAdd] = useState('');
   const [recording, setRecording] = useState(null); // 'toggle' | 'quickadd' | null
 
-  const { locale, setLocale, supportedLocales } = useI18n();
+  const { locale, setLocale, supportedLocales, t } = useI18n();
 
   useEffect(() => {
     loadSettings();
@@ -137,6 +138,7 @@ export default function Settings() {
   const handleSave = async () => {
     setIsSaving(true);
     setSaveMessage('');
+    setSaveStatus(null);
     try {
       await api.saveSettings({
         ...settings,
@@ -146,11 +148,16 @@ export default function Settings() {
         remind_minutes: remindEnabled ? remindMinutes : -1,
       });
 
-      setSaveMessage('设置已保存');
-      setTimeout(() => setSaveMessage(''), 2000);
+      setSaveStatus('success');
+      setSaveMessage(t('settings.saveSuccess'));
+      setTimeout(() => {
+        setSaveMessage('');
+        setSaveStatus(null);
+      }, 2000);
     } catch (error) {
       console.error('Failed to save settings:', error);
-      setSaveMessage('保存失败');
+      setSaveStatus('error');
+      setSaveMessage(t('settings.saveFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -270,13 +277,13 @@ export default function Settings() {
             <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="2" />
             <path d="M8 12l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <span className="text-sm font-medium text-gray-600">设置</span>
+          <span className="text-sm font-medium text-gray-600">{t('settings.title')}</span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={handleMinimize}
             className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200/60 text-gray-400 hover:text-gray-600 transition-colors"
-            title="最小化"
+            title={t('settings.minimize')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M5 12h14" />
@@ -299,30 +306,30 @@ export default function Settings() {
 
           {/* Appearance Settings */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-800 mb-1">外观设置</h2>
-            <p className="text-sm text-gray-500 mb-4">调整主题风格和待办清单窗口透明度</p>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">{t('settings.appearance.title')}</h2>
+            <p className="text-sm text-gray-500 mb-4">{t('settings.appearance.description')}</p>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
               {/* Theme Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">主题模式</label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">{t('settings.theme.label')}</label>
                 <div className="grid grid-cols-3 gap-3">
-                  {THEMES.map((t) => (
+                  {THEMES.map((themeItem) => (
                     <button
-                      key={t.id}
+                      key={themeItem.id}
                       onClick={() => {
                         // Apply theme immediately (local first, then IPC sync)
-                        document.documentElement.setAttribute('data-theme', t.id);
-                        setTheme(t.id);
+                        document.documentElement.setAttribute('data-theme', themeItem.id);
+                        setTheme(themeItem.id);
                       }}
                       className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                        theme === t.id
+                        theme === themeItem.id
                           ? 'border-sky-500 bg-sky-50 text-sky-600'
                           : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50'
                       }`}
                     >
-                      <ThemeIcon type={t.icon} />
-                      <span className="text-xs font-medium">{t.label}</span>
+                      <ThemeIcon type={themeItem.icon} />
+                      <span className="text-xs font-medium">{t(`settings.theme.${themeItem.id}`)}</span>
                     </button>
                   ))}
                 </div>
@@ -331,7 +338,7 @@ export default function Settings() {
               {/* Opacity Slider */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  待办清单透明度
+                  {t('settings.opacity.label')}
                 </label>
                 <div className="flex items-center gap-4">
                   <input
@@ -347,13 +354,13 @@ export default function Settings() {
                     {Math.round(opacity * 100)}%
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">仅影响待办清单悬浮窗口的透明度</p>
+                <p className="text-xs text-gray-400 mt-1">{t('settings.opacity.hint')}</p>
               </div>
 
               {/* Language Select */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  显示语言
+                  {t('settings.language.label')}
                 </label>
                 <select
                   value={locale}
@@ -364,24 +371,24 @@ export default function Settings() {
                     <option key={code} value={code}>{label}</option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-400 mt-1">选择界面显示语言</p>
+                <p className="text-xs text-gray-400 mt-1">{t('settings.language.hint')}</p>
               </div>
             </div>
           </div>
 
           {/* Reminder Settings */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-800 mb-1">提醒设置</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">{t('settings.reminder.title')}</h2>
             <p className="text-sm text-gray-500 mb-4">
-              任务到达截止日期时，弹出系统通知提醒您
+              {t('settings.reminder.description')}
             </p>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
               {/* Enable/Disable Reminder */}
               <div className="flex items-center justify-between">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">启用提醒</label>
-                  <p className="text-xs text-gray-400 mt-1">关闭后不会再弹出到期提醒</p>
+                  <label className="text-sm font-medium text-gray-700">{t('settings.reminder.enable')}</label>
+                  <p className="text-xs text-gray-400 mt-1">{t('settings.reminder.enableHint')}</p>
                 </div>
                 <button
                   onClick={() => {
@@ -405,7 +412,7 @@ export default function Settings() {
               {remindEnabled && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    提前提醒时间
+                    {t('settings.reminder.leadTime')}
                   </label>
                   <div className="flex items-center gap-3">
                     <input
@@ -444,13 +451,13 @@ export default function Settings() {
                       />
                       <span className="text-xs text-gray-500 w-8">
                         {remindMinutes >= 60
-                          ? `${Math.floor(remindMinutes / 60)}h`
-                          : 'min'}
+                          ? t('settings.reminder.hourShort', { value: Math.floor(remindMinutes / 60) })
+                          : t('settings.reminder.minuteShort')}
                       </span>
                     </div>
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
-                    可拖动滑块或手动输入，0 = 准时提醒，最大 1440 分钟（24 小时）
+                    {t('settings.reminder.leadTimeHint')}
                   </p>
                 </div>
               )}
@@ -464,11 +471,11 @@ export default function Settings() {
                 disabled={notifTesting}
                 className="px-4 py-1.5 text-xs font-medium text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {notifTesting ? '发送中...' : '发送测试通知'}
+                {notifTesting ? t('settings.notification.sending') : t('settings.notification.test')}
               </button>
               {notifResult && (
                 <span className={`ml-2 text-xs ${notifResult.success ? 'text-green-600' : 'text-red-500'}`}>
-                  {notifResult.success ? '已发送，请查看系统通知' : `失败：${notifResult.error}`}
+                  {notifResult.success ? t('settings.notification.success') : `${t('settings.notification.failed')}${notifResult.error}`}
                 </span>
               )}
             </div>
@@ -476,12 +483,12 @@ export default function Settings() {
 
           {/* Shortcut Settings */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-800 mb-1">⌨️ 快捷键</h2>
-            <p className="text-sm text-gray-500 mb-4">自定义全局快捷键，避免与其他应用冲突</p>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">{t('settings.shortcuts.title')}</h2>
+            <p className="text-sm text-gray-500 mb-4">{t('settings.shortcuts.description')}</p>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
               <ShortcutRecorder
-                label="显示/隐藏主窗口"
+                label={t('settings.shortcuts.toggle')}
                 defaultValue={shortcutToggle}
                 onChange={(val) => {
                   setShortcutToggle(val);
@@ -489,26 +496,26 @@ export default function Settings() {
                 }}
               />
               <ShortcutRecorder
-                label="快捷添加窗口"
+                label={t('settings.shortcuts.quickAdd')}
                 defaultValue={shortcutQuickAdd}
                 onChange={(val) => {
                   setShortcutQuickAdd(val);
                   api.updateShortcuts(shortcutToggle, val).catch(() => {});
                 }}
               />
-              <p className="text-xs text-gray-400">点击上方按钮，然后按下您想要设置的快捷键组合</p>
+              <p className="text-xs text-gray-400">{t('settings.shortcuts.hint')}</p>
             </div>
           </div>
 
           {/* Pomodoro Settings */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-800 mb-1">🍅 番茄钟</h2>
-            <p className="text-sm text-gray-500 mb-4">配置番茄钟专注时长和休息间隔</p>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">{t('settings.pomodoro.title')}</h2>
+            <p className="text-sm text-gray-500 mb-4">{t('settings.pomodoro.description')}</p>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">专注时长</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">{t('settings.pomodoro.focus')}</label>
                   <div className="flex items-center gap-0.5">
                     <input
                       type="number"
@@ -517,12 +524,12 @@ export default function Settings() {
                       min="1" max="120"
                       className="w-full px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
                     />
-                    <span className="text-xs text-gray-400 w-5 shrink-0 text-center">分</span>
+                    <span className="text-xs text-gray-400 w-5 shrink-0 text-center">{t('settings.pomodoro.minute')}</span>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-0.5">建议 25，范围 1-120</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{t('settings.pomodoro.focusHint')}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">短休息</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">{t('settings.pomodoro.shortBreak')}</label>
                   <div className="flex items-center gap-0.5">
                     <input
                       type="number"
@@ -531,12 +538,12 @@ export default function Settings() {
                       min="1" max="30"
                       className="w-full px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
                     />
-                    <span className="text-xs text-gray-400 w-5 shrink-0 text-center">分</span>
+                    <span className="text-xs text-gray-400 w-5 shrink-0 text-center">{t('settings.pomodoro.minute')}</span>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-0.5">建议 5</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{t('settings.pomodoro.shortBreakHint')}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">长休息</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">{t('settings.pomodoro.longBreak')}</label>
                   <div className="flex items-center gap-0.5">
                     <input
                       type="number"
@@ -545,12 +552,12 @@ export default function Settings() {
                       min="1" max="60"
                       className="w-full px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
                     />
-                    <span className="text-xs text-gray-400 w-5 shrink-0 text-center">分</span>
+                    <span className="text-xs text-gray-400 w-5 shrink-0 text-center">{t('settings.pomodoro.minute')}</span>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-0.5">建议 15</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{t('settings.pomodoro.longBreakHint')}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">长休息间隔</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">{t('settings.pomodoro.cyclesBeforeLong')}</label>
                   <div className="flex items-center gap-0.5">
                     <input
                       type="number"
@@ -559,9 +566,9 @@ export default function Settings() {
                       min="1" max="10"
                       className="w-full px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
                     />
-                    <span className="text-xs text-gray-400 w-5 shrink-0 text-center">轮</span>
+                    <span className="text-xs text-gray-400 w-5 shrink-0 text-center">{t('settings.pomodoro.cycle')}</span>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-0.5">建议 4 轮</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{t('settings.pomodoro.cyclesBeforeLongHint')}</p>
                 </div>
               </div>
             </div>
@@ -569,15 +576,15 @@ export default function Settings() {
 
           {/* AI Settings */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-800 mb-1">AI 分类设置</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">{t('settings.ai.title')}</h2>
             <p className="text-sm text-gray-500 mb-4">
-              配置大模型 API，用于归档任务时自动判断工作类别
+              {t('settings.ai.description')}
             </p>
 
             {/* 快速选择服务商 */}
             <div className="mb-5">
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                快速选择服务商
+                {t('settings.ai.quickSelect')}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {PROVIDERS.map((p) => (
@@ -607,37 +614,37 @@ export default function Settings() {
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-gray-400 mt-2">点击选择服务商，自动填充 Base URL 和模型名称</p>
+              <p className="text-xs text-gray-400 mt-2">{t('settings.ai.providerHint')}</p>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
               {/* API Format */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  API 格式
+                  {t('settings.ai.apiFormat')}
                 </label>
                 <select
                   value={settings.api_format}
                   onChange={(e) => handleFormatChange(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
                 >
-                  <option value="openai">OpenAI 格式（GPT、DeepSeek、智谱等）</option>
-                  <option value="anthropic">Anthropic 格式（Claude）</option>
+                  <option value="openai">{t('settings.ai.apiFormatOpenAI')}</option>
+                  <option value="anthropic">{t('settings.ai.apiFormatAnthropic')}</option>
                 </select>
-                <p className="text-xs text-gray-400 mt-1">选择 API 提供商格式，切换后会自动填充默认地址和模型</p>
+                <p className="text-xs text-gray-400 mt-1">{t('settings.ai.apiFormatHint')}</p>
               </div>
 
               {/* API Key */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  API Key
+                  {t('settings.ai.apiKey')}
                 </label>
                 <div className="relative">
                   <input
                     type={showApiKey ? 'text' : 'password'}
                     value={settings.api_key}
                     onChange={(e) => handleChange('api_key', e.target.value)}
-                    placeholder="sk-..."
+                    placeholder={t('settings.ai.apiKeyPlaceholder')}
                     className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all pr-10"
                   />
                   <button
@@ -657,71 +664,71 @@ export default function Settings() {
                     )}
                   </button>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">输入你的 API 密钥</p>
+                <p className="text-xs text-gray-400 mt-1">{t('settings.ai.apiKeyHint')}</p>
               </div>
 
               {/* Base URL */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Base URL
+                  {t('settings.ai.baseUrl')}
                 </label>
                 <input
                   type="text"
                   value={settings.base_url}
                   onChange={(e) => handleChange('base_url', e.target.value)}
-                  placeholder="https://api.openai.com/v1"
+                  placeholder={t('settings.ai.baseUrlPlaceholder')}
                   className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
                 />
-                <p className="text-xs text-gray-400 mt-1">API 的基础地址，切换格式后会自动填充</p>
+                <p className="text-xs text-gray-400 mt-1">{t('settings.ai.baseUrlHint')}</p>
               </div>
 
               {/* Model */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  模型名称
+                  {t('settings.ai.model')}
                 </label>
                 <input
                   type="text"
                   value={settings.model}
                   onChange={(e) => handleChange('model', e.target.value)}
-                  placeholder="gpt-4o-mini"
+                  placeholder={t('settings.ai.modelPlaceholder')}
                   className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
                 />
-                <p className="text-xs text-gray-400 mt-1">使用的模型名称，如 gpt-4o-mini、gpt-4、claude-3-haiku 等</p>
+                <p className="text-xs text-gray-400 mt-1">{t('settings.ai.modelHint')}</p>
               </div>
 
               {/* Categorize Max Tokens */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  分类最大 Token 数
+                  {t('settings.ai.categorizeTokens')}
                 </label>
                 <input
                   type="number"
                   value={settings.categorize_max_tokens}
                   onChange={(e) => handleChange('categorize_max_tokens', parseInt(e.target.value) || 2048)}
-                  placeholder="2048"
+                  placeholder={t('settings.ai.categorizeTokensPlaceholder')}
                   min="256"
                   max="4096"
                   className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
                 />
-                <p className="text-xs text-gray-400 mt-1">AI 分类时的最大 Token 数（256-4096）</p>
+                <p className="text-xs text-gray-400 mt-1">{t('settings.ai.categorizeTokensHint')}</p>
               </div>
 
               {/* Analyze Max Tokens */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  分析最大 Token 数
+                  {t('settings.ai.analyzeTokens')}
                 </label>
                 <input
                   type="number"
                   value={settings.analyze_max_tokens}
                   onChange={(e) => handleChange('analyze_max_tokens', parseInt(e.target.value) || 10000)}
-                  placeholder="10000"
+                  placeholder={t('settings.ai.analyzeTokensPlaceholder')}
                   min="1024"
                   max="16384"
                   className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
                 />
-                <p className="text-xs text-gray-400 mt-1">AI 工作分析时的最大 Token 数（1024-16384）</p>
+                <p className="text-xs text-gray-400 mt-1">{t('settings.ai.analyzeTokensHint')}</p>
               </div>
 
               {/* Test Connection */}
@@ -731,11 +738,11 @@ export default function Settings() {
                   disabled={testing || !settings.api_key}
                   className="px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {testing ? '测试中...' : '测试连接'}
+                  {testing ? t('settings.ai.testing') : t('settings.ai.testConnection')}
                 </button>
                 {testResult && (
                   <span className={`ml-3 text-sm ${testResult.success ? 'text-green-600' : 'text-red-500'}`}>
-                    {testResult.success ? testResult.message : `连接失败：${testResult.error}`}
+                    {testResult.success ? testResult.message : `${t('settings.ai.connectionFailed')}${testResult.error}`}
                   </span>
                 )}
               </div>
@@ -744,60 +751,60 @@ export default function Settings() {
 
           {/* Data Management */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-800 mb-1">数据管理</h2>
-            <p className="text-sm text-gray-500 mb-4">备份或恢复您的待办数据</p>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">{t('settings.data.title')}</h2>
+            <p className="text-sm text-gray-500 mb-4">{t('settings.data.description')}</p>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">备份数据</label>
-                  <p className="text-xs text-gray-400 mt-1">将当前数据导出到指定位置</p>
+                  <label className="text-sm font-medium text-gray-700">{t('settings.data.backup')}</label>
+                  <p className="text-xs text-gray-400 mt-1">{t('settings.data.backupDesc')}</p>
                 </div>
                 <button
                   onClick={async () => {
                     try {
                       const result = await api.backupDatabase();
                       if (result.success) {
-                        alert('备份成功！文件已保存到：' + result.path);
+                        alert(`${t('settings.data.backupSuccess')}${result.path}`);
                       } else {
-                        alert('备份失败：' + result.error);
+                        alert(`${t('settings.data.backupFailed')}${result.error}`);
                       }
                     } catch (error) {
-                      alert('备份失败：' + error.message);
+                      alert(`${t('settings.data.backupFailed')}${error.message}`);
                     }
                   }}
                   className="px-4 py-2 text-sm font-medium bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors"
                 >
-                  备份数据
+                  {t('settings.data.backup')}
                 </button>
               </div>
 
               <div className="flex items-center justify-between">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">恢复数据</label>
-                  <p className="text-xs text-gray-400 mt-1">从备份文件恢复数据（会覆盖当前数据）</p>
+                  <label className="text-sm font-medium text-gray-700">{t('settings.data.restore')}</label>
+                  <p className="text-xs text-gray-400 mt-1">{t('settings.data.restoreDesc')}</p>
                 </div>
                 <button
                   onClick={async () => {
-                    if (!confirm('确定要从备份文件恢复数据吗？当前数据将被覆盖！')) {
+                    if (!confirm(t('settings.data.restoreConfirm'))) {
                       return;
                     }
                     try {
                       const result = await api.restoreDatabase();
                       if (result.success) {
-                        alert('恢复成功！应用将重启以应用更改。');
+                        alert(t('settings.data.restoreSuccess'));
                         // Reload the window to apply changes
                         window.location.reload();
                       } else {
-                        alert('恢复失败：' + result.error);
+                        alert(`${t('settings.data.restoreFailed')}${result.error}`);
                       }
                     } catch (error) {
-                      alert('恢复失败：' + error.message);
+                      alert(`${t('settings.data.restoreFailed')}${error.message}`);
                     }
                   }}
                   className="px-4 py-2 text-sm font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
                 >
-                  恢复数据
+                  {t('settings.data.restore')}
                 </button>
               </div>
             </div>
@@ -810,10 +817,10 @@ export default function Settings() {
               disabled={isSaving}
               className="px-6 py-2 text-sm font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isSaving ? '保存中...' : '保存设置'}
+              {isSaving ? t('settings.saving') : t('settings.saveButton')}
             </button>
             {saveMessage && (
-              <span className={`text-sm ${saveMessage.includes('失败') ? 'text-red-500' : 'text-green-500'}`}>
+              <span className={`text-sm ${saveStatus === 'error' ? 'text-red-500' : 'text-green-500'}`}>
                 {saveMessage}
               </span>
             )}
@@ -821,18 +828,18 @@ export default function Settings() {
 
           {/* Usage Tips */}
           <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">使用说明</h3>
+            <h3 className="text-sm font-medium text-gray-700 mb-3">{t('settings.usage.title')}</h3>
             <div className="space-y-2 text-sm text-gray-600">
-              <p>1. 填写 API Key 和相关配置后，点击"保存设置"</p>
-              <p>2. 在历史归档页面，对未分类的任务点击"AI分类"按钮</p>
-              <p>3. 系统会自动调用大模型判断任务类别并更新</p>
-              <p>4. 支持 OpenAI 格式（GPT、DeepSeek、智谱等）和 Anthropic 格式（Claude）</p>
+              <p>{t('settings.usage.tip1')}</p>
+              <p>{t('settings.usage.tip2')}</p>
+              <p>{t('settings.usage.tip3')}</p>
+              <p>{t('settings.usage.tip4')}</p>
             </div>
           </div>
 
           {/* Supported Models */}
           <div className="bg-sky-50 rounded-xl border border-sky-100 p-4">
-            <h3 className="text-sm font-medium text-sky-700 mb-2">支持的模型服务</h3>
+            <h3 className="text-sm font-medium text-sky-700 mb-2">{t('settings.supportedModels.title')}</h3>
             <div className="grid grid-cols-2 gap-2 text-sm text-sky-600">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 bg-sky-400 rounded-full" />
@@ -870,6 +877,7 @@ export default function Settings() {
 
 // ===== ShortcutRecorder Component =====
 function ShortcutRecorder({ label, defaultValue, onChange }) {
+  const { t } = useI18n();
   const [recording, setRecording] = useState(false);
   const [current, setCurrent] = useState(defaultValue || '');
   const [error, setError] = useState('');
@@ -907,7 +915,7 @@ function ShortcutRecorder({ label, defaultValue, onChange }) {
       }
 
       if (parts.length === 0) {
-        setError('请至少包含一个修饰键（Cmd/Ctrl/Alt/Shift）');
+        setError(t('settings.shortcuts.modifierRequired'));
         return;
       }
 
@@ -919,7 +927,7 @@ function ShortcutRecorder({ label, defaultValue, onChange }) {
 
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [recording, onChange]);
+  }, [recording, onChange, t]);
 
   return (
     <div>
@@ -936,14 +944,14 @@ function ShortcutRecorder({ label, defaultValue, onChange }) {
         {recording ? (
           <span className="flex items-center gap-2">
             <span className="w-2 h-2 bg-sky-400 rounded-full animate-pulse" />
-            按下快捷键...
+            {t('settings.shortcuts.recording')}
           </span>
         ) : (
-          current || '未设置'
+          current || t('settings.shortcuts.notSet')
         )}
       </button>
       {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
-      <p className="text-xs text-gray-400 mt-1">点击后按下快捷键组合，至少包含一个修饰键。按 Esc 取消</p>
+      <p className="text-xs text-gray-400 mt-1">{t('settings.shortcuts.recorderHint')}</p>
     </div>
   );
 }
