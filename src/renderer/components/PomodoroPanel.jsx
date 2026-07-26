@@ -3,8 +3,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import api from '../api';
 import CustomSelect from './CustomSelect';
+import { useI18n } from '../i18n';
 
 export default function PomodoroPanel({ todos }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [state, setState] = useState({
     isRunning: false,
@@ -69,7 +71,11 @@ export default function PomodoroPanel({ todos }) {
   const isFocus = state.cycleType === 'focus';
   const bgColor = isFocus ? 'bg-rose-50' : 'bg-emerald-50';
   const borderColor = isFocus ? 'border-rose-200' : 'border-emerald-200';
-  const cycleLabel = isFocus ? '专注' : state.cycleType === 'short_break' ? '短休息' : '长休息';
+  const cycleLabel = isFocus
+    ? t('pomodoro.focus')
+    : state.cycleType === 'short_break'
+      ? t('pomodoro.shortBreak')
+      : t('pomodoro.longBreak');
 
   // SVG ring colors by theme — raised contrast so the timer stays readable
   // across light / dark / eye-care modes and against window transparency.
@@ -170,17 +176,17 @@ export default function PomodoroPanel({ todos }) {
         }`}
       >
         <span className={`text-base transition-transform duration-300 ${state.isRunning ? 'animate-pulse-soft' : ''}`}>🍅</span>
-        <span className="text-sm font-medium text-gray-700 transition-colors duration-200">番茄钟</span>
+        <span className="text-sm font-medium text-gray-700 transition-colors duration-200">{t('pomodoro.title')}</span>
         {state.isRunning && (
           <span className="text-sm font-bold tabular-nums transition-all duration-300" style={{ color: countingColor }}>
-            {formatTime(state.timeRemaining)}{state.isPaused ? ' 暂停' : ''}
+            {formatTime(state.timeRemaining)}{state.isPaused ? t('pomodoro.pausedSuffix') : ''}
           </span>
         )}
         {state.isRunning && state.taskText && (
           <span className="text-[10px] text-gray-500 truncate flex-1">{state.taskText}</span>
         )}
         {state.cyclesCompleted > 0 && !state.isRunning && (
-          <span className="text-xs text-gray-400">完成 {state.cyclesCompleted} 个</span>
+          <span className="text-xs text-gray-400">{t('pomodoro.completedCount', { count: state.cyclesCompleted })}</span>
         )}
         <div className="flex items-center gap-1 ml-auto">
           {state.isRunning && (
@@ -188,17 +194,17 @@ export default function PomodoroPanel({ todos }) {
               {state.isPaused ? (
                 <span onClick={(e) => { e.stopPropagation(); handleResume(); }}
                   className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer transition-all duration-200 ${isFocus ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
-                  继续
+                  {t('pomodoro.resume')}
                 </span>
               ) : (
                 <span onClick={(e) => { e.stopPropagation(); handlePause(); }}
                   className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer transition-all duration-200 ${isFocus ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
-                  暂停
+                  {t('pomodoro.pause')}
                 </span>
               )}
               <span onClick={(e) => { e.stopPropagation(); handleStop(); }}
                 className="text-[10px] px-1 py-0.5 rounded cursor-pointer transition-all duration-200 text-gray-400 border border-gray-200 hover:bg-gray-50 hover:text-gray-500">
-                结束
+                {t('pomodoro.stop')}
               </span>
             </>
           )}
@@ -265,7 +271,7 @@ export default function PomodoroPanel({ todos }) {
                 );
               })}
               <span className="text-[10px] text-gray-500 ml-1 transition-opacity duration-300">
-                第 {state.cyclesCompleted + 1} 轮
+                {t('pomodoro.roundNumber', { round: state.cyclesCompleted + 1 })}
               </span>
             </div>
           </div>
@@ -275,17 +281,17 @@ export default function PomodoroPanel({ todos }) {
             <div className="bg-gray-50 rounded-lg px-3 py-2.5 transition-all duration-300 hover:bg-gray-100/80">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-xs">📌</span>
-                <span className="text-xs text-gray-500">关联任务</span>
-                <span className="text-[10px] text-gray-300">可选</span>
+                <span className="text-xs text-gray-500">{t('pomodoro.linkedTask')}</span>
+                <span className="text-[10px] text-gray-300">{t('pomodoro.optional')}</span>
               </div>
               <CustomSelect
                 value={selectedTaskId || ''}
                 onChange={(val) => setSelectedTaskId(val ? Number(val) : null)}
                 options={[
-                  { value: '', label: '无关联任务' },
+                  { value: '', label: t('pomodoro.noLinkedTask') },
                   ...activeTodos.map((t) => ({ value: t.id, label: t.text })),
                 ]}
-                placeholder="无关联任务"
+                placeholder={t('pomodoro.noLinkedTask')}
                 dropUp
               />
             </div>
@@ -305,10 +311,10 @@ export default function PomodoroPanel({ todos }) {
                     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
                     <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                   </svg>
-                  启动中...
+                  {t('pomodoro.starting')}
                 </span>
               ) : (
-                '开始专注'
+                t('pomodoro.start')
               )}
             </button>
           )}
