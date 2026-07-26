@@ -2,12 +2,8 @@ import React, { useState, useEffect } from 'react';
 import ArchiveViewer from './ArchiveViewer';
 import WorkAnalysis from './WorkAnalysis';
 
+import { useI18n } from '../i18n';
 import api from '../api';
-
-const TABS = [
-  { id: 'archive', label: '历史归档', icon: 'archive' },
-  { id: 'analysis', label: '工作分析', icon: 'chart' },
-];
 
 function TabIcon({ type }) {
   switch (type) {
@@ -30,9 +26,15 @@ function TabIcon({ type }) {
 }
 
 export default function TrayView() {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState('archive');
   const [isMaximized, setIsMaximized] = useState(false);
   const [pomodoroState, setPomodoroState] = useState(null);
+
+  const tabs = [
+    { id: 'archive', label: t('tray.history'), icon: 'archive' },
+    { id: 'analysis', label: t('tray.analysis'), icon: 'chart' },
+  ];
 
   // Load theme on mount, listen for changes
   useEffect(() => {
@@ -112,13 +114,13 @@ export default function TrayView() {
             <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="2" />
             <path d="M8 12l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <span className="text-sm font-medium text-gray-600">历史归档</span>
+          <span className="text-sm font-medium text-gray-600">{t('tray.title')}</span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={handleMinimize}
             className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200/60 text-gray-400 hover:text-gray-600 transition-colors"
-            title="最小化"
+            title={t('tray.minimize')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M5 12h14" />
@@ -127,7 +129,7 @@ export default function TrayView() {
           <button
             onClick={handleMaximize}
             className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200/60 text-gray-400 hover:text-gray-600 transition-colors"
-            title={isMaximized ? "还原" : "最大化"}
+            title={isMaximized ? t('tray.restore') : t('tray.maximize')}
           >
             {isMaximized ? (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -155,8 +157,8 @@ export default function TrayView() {
         <div className={`flex items-center gap-2 px-4 py-2 border-b ${pomodoroState.cycleType === 'focus' ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
           <span className="text-sm">{pomodoroState.cycleType === 'focus' ? '🍅' : '☕'}</span>
           <span className={`text-xs font-semibold ${pomodoroState.cycleType === 'focus' ? 'text-rose-600' : 'text-emerald-600'}`}>
-            {pomodoroState.cycleType === 'focus' ? '专注中' : '休息中'}
-            {pomodoroState.isPaused && ' (暂停)'}
+            {pomodoroState.cycleType === 'focus' ? t('tray.focus') : t('tray.rest')}
+            {pomodoroState.isPaused && ` (${t('tray.paused')})`}
           </span>
           <span className={`text-sm font-bold tabular-nums ${pomodoroState.cycleType === 'focus' ? 'text-rose-500' : 'text-emerald-500'}`}>
             {String(Math.floor(pomodoroState.timeRemaining / 60)).padStart(2, '0')}:{String(pomodoroState.timeRemaining % 60).padStart(2, '0')}
@@ -170,7 +172,7 @@ export default function TrayView() {
       {/* Tab Navigation */}
       <div className="bg-white border-b border-gray-200 px-6">
         <div className="flex gap-1">
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
