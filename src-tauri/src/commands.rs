@@ -3,6 +3,67 @@ use crate::AppState;
 use serde_json::{json, Value};
 use tauri::{Emitter, Manager, State, Window};
 
+// ===== Localization helpers =====
+
+fn current_locale(state: &State<'_, AppState>) -> String {
+    state.locale.lock().clone()
+}
+
+fn t(locale: &str, key: &str) -> String {
+    if locale == "zh-CN" {
+        return zh_cn(key);
+    }
+    en(key).unwrap_or_else(|| zh_cn(key))
+}
+
+fn zh_cn(key: &str) -> String {
+    match key {
+        "invalid_text" => "无效的任务内容",
+        "invalid_id" => "无效的 ID",
+        "invalid_input" => "无效的输入",
+        "invalid_date_format" => "无效的日期格式",
+        "no_data" => "没有可导出的数据",
+        "user_cancelled" => "用户取消",
+        "missing_api_key" => "请先填写 API Key",
+        "notification_title" => "TodoFloat 提醒",
+        "notification_test_body" => "这是一条测试通知，如果你看到了说明提醒功能正常 ✔",
+        "pomodoro_already_running" => "番茄钟已在运行",
+        "pomodoro_not_running" => "没有正在运行的番茄钟",
+        "status_done" => "已完成",
+        "status_todo" => "待办",
+        "category_uncategorized" => "未分类",
+        "csv_header" => "﻿任务内容,状态,截止日期,类别,备注,创建时间,完成时间,归档时间\n",
+        "file_type_csv" => "CSV 文件",
+        "file_type_db" => "数据库文件",
+        _ => key,
+    }
+    .to_string()
+}
+
+fn en(key: &str) -> Option<String> {
+    Some(match key {
+        "invalid_text" => "Invalid text",
+        "invalid_id" => "Invalid id",
+        "invalid_input" => "Invalid input",
+        "invalid_date_format" => "Invalid date format",
+        "no_data" => "No data to export",
+        "user_cancelled" => "User cancelled",
+        "missing_api_key" => "Please enter an API key first",
+        "notification_title" => "TodoFloat Reminder",
+        "notification_test_body" => "This is a test notification. If you see it, notifications are working ✔",
+        "pomodoro_already_running" => "Pomodoro is already running",
+        "pomodoro_not_running" => "No pomodoro is running",
+        "status_done" => "Done",
+        "status_todo" => "Todo",
+        "category_uncategorized" => "Uncategorized",
+        "csv_header" => "﻿Task,Status,Due Date,Category,Note,Created At,Completed At,Archived At\n",
+        "file_type_csv" => "CSV Files",
+        "file_type_db" => "Database Files",
+        _ => return None,
+    }
+    .to_string())
+}
+
 // ===== Helper functions =====
 
 fn is_positive_int(v: &Value) -> bool {
@@ -59,8 +120,9 @@ pub fn get_future_scheduled_todos(state: State<'_, AppState>) -> Result<Vec<Valu
 
 #[tauri::command]
 pub fn add_todo(state: State<'_, AppState>, text: String) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_non_empty_string(&json!(text), 500) {
-        return Err("Invalid text".to_string());
+        return Err(t(&locale, "invalid_text"));
     }
     let todo = state.db.lock().add_todo(text.trim()).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
@@ -68,8 +130,9 @@ pub fn add_todo(state: State<'_, AppState>, text: String) -> Result<Value, Strin
 
 #[tauri::command]
 pub fn toggle_todo(state: State<'_, AppState>, id: i64) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) {
-        return Err("Invalid id".to_string());
+        return Err(t(&locale, "invalid_id"));
     }
     let todo = state.db.lock().toggle_todo(id).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
@@ -77,8 +140,9 @@ pub fn toggle_todo(state: State<'_, AppState>, id: i64) -> Result<Value, String>
 
 #[tauri::command]
 pub fn delete_todo(state: State<'_, AppState>, id: i64) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) {
-        return Err("Invalid id".to_string());
+        return Err(t(&locale, "invalid_id"));
     }
     state.db.lock().delete_todo(id).map_err(|e| e.to_string())?;
     Ok(json!({ "success": true }))
@@ -86,8 +150,9 @@ pub fn delete_todo(state: State<'_, AppState>, id: i64) -> Result<Value, String>
 
 #[tauri::command]
 pub fn recover_todo(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) {
-        return Err("Invalid id".to_string());
+        return Err(t(&locale, "invalid_id"));
     }
     let todo = state.db.lock().recover_todo(id).map_err(|e| e.to_string())?;
     let _ = app.emit_to("float", "data-changed", json!({}));
@@ -96,8 +161,9 @@ pub fn recover_todo(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) 
 
 #[tauri::command]
 pub fn restore_todo(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) {
-        return Err("Invalid id".to_string());
+        return Err(t(&locale, "invalid_id"));
     }
     let todo = state.db.lock().restore_todo(id).map_err(|e| e.to_string())?;
     let _ = app.emit_to("float", "data-changed", json!({}));
@@ -106,8 +172,9 @@ pub fn restore_todo(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) 
 
 #[tauri::command]
 pub async fn archive_todo(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) {
-        return Err("Invalid id".to_string());
+        return Err(t(&locale, "invalid_id"));
     }
     let todo = state.db.lock().archive_todo(id).map_err(|e| e.to_string())?;
     let _ = app.emit_to("tray-view", "data-changed", json!({}));
@@ -151,8 +218,9 @@ pub fn get_archived(state: State<'_, AppState>, filters: Option<Value>) -> Resul
 
 #[tauri::command]
 pub fn update_note(state: State<'_, AppState>, id: i64, note: String) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) {
-        return Err("Invalid id".to_string());
+        return Err(t(&locale, "invalid_id"));
     }
     let todo = state.db.lock().update_note(id, &note).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
@@ -160,8 +228,9 @@ pub fn update_note(state: State<'_, AppState>, id: i64, note: String) -> Result<
 
 #[tauri::command]
 pub fn update_category(state: State<'_, AppState>, id: i64, category: Option<String>) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) {
-        return Err("Invalid id".to_string());
+        return Err(t(&locale, "invalid_id"));
     }
     let todo = state.db.lock().update_category(id, category.as_deref()).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
@@ -169,8 +238,9 @@ pub fn update_category(state: State<'_, AppState>, id: i64, category: Option<Str
 
 #[tauri::command]
 pub fn set_due_date(state: State<'_, AppState>, id: i64, due_date: Option<String>) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) {
-        return Err("Invalid id".to_string());
+        return Err(t(&locale, "invalid_id"));
     }
     if let Some(ref d) = due_date {
         if !d.is_empty() {
@@ -182,7 +252,7 @@ pub fn set_due_date(state: State<'_, AppState>, id: i64, due_date: Option<String
                 && d.chars().nth(7) == Some('-')
                 && d.chars().skip(8).take(2).all(|c| c.is_ascii_digit());
             if !valid {
-                return Err("Invalid date format".to_string());
+                return Err(t(&locale, "invalid_date_format"));
             }
         }
     }
@@ -192,8 +262,9 @@ pub fn set_due_date(state: State<'_, AppState>, id: i64, due_date: Option<String
 
 #[tauri::command]
 pub fn set_scheduled_date(state: State<'_, AppState>, id: i64, date_str: Option<String>) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) {
-        return Err("Invalid id".to_string());
+        return Err(t(&locale, "invalid_id"));
     }
     let todo = state.db.lock().set_scheduled_date(id, date_str.as_deref()).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
@@ -219,8 +290,9 @@ pub fn reorder(state: State<'_, AppState>, orders: Vec<Value>) -> Result<Value, 
 
 #[tauri::command]
 pub fn update_color(state: State<'_, AppState>, id: i64, color: Option<String>) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) {
-        return Err("Invalid id".to_string());
+        return Err(t(&locale, "invalid_id"));
     }
     let todo = state.db.lock().update_color(id, color.as_deref()).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
@@ -228,8 +300,9 @@ pub fn update_color(state: State<'_, AppState>, id: i64, color: Option<String>) 
 
 #[tauri::command]
 pub fn update_text(state: State<'_, AppState>, id: i64, text: String) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) || !is_non_empty_string(&json!(text), 500) {
-        return Err("Invalid input".to_string());
+        return Err(t(&locale, "invalid_input"));
     }
     let todo = state.db.lock().update_text(id, text.trim()).map_err(|e| e.to_string())?;
     serde_json::to_value(todo).map_err(|e| e.to_string())
@@ -248,8 +321,9 @@ pub fn get_subtasks(state: State<'_, AppState>, todo_id: i64) -> Result<Vec<Valu
 
 #[tauri::command]
 pub fn add_subtask(state: State<'_, AppState>, todo_id: i64, text: String) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(todo_id)) || !is_non_empty_string(&json!(text), 500) {
-        return Err("Invalid input".to_string());
+        return Err(t(&locale, "invalid_input"));
     }
     let sub = state.db.lock().add_subtask(todo_id, text.trim()).map_err(|e| e.to_string())?;
     serde_json::to_value(sub).map_err(|e| e.to_string())
@@ -257,8 +331,9 @@ pub fn add_subtask(state: State<'_, AppState>, todo_id: i64, text: String) -> Re
 
 #[tauri::command]
 pub fn toggle_subtask(state: State<'_, AppState>, id: i64) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) {
-        return Err("Invalid id".to_string());
+        return Err(t(&locale, "invalid_id"));
     }
     let sub = state.db.lock().toggle_subtask(id).map_err(|e| e.to_string())?;
     serde_json::to_value(sub).map_err(|e| e.to_string())
@@ -275,8 +350,9 @@ pub fn delete_subtask(state: State<'_, AppState>, id: i64) -> Result<Value, Stri
 
 #[tauri::command]
 pub fn update_subtask_text(state: State<'_, AppState>, id: i64, text: String) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_positive_int(&json!(id)) || !is_non_empty_string(&json!(text), 500) {
-        return Err("Invalid input".to_string());
+        return Err(t(&locale, "invalid_input"));
     }
     let sub = state.db.lock().update_subtask_text(id, text.trim()).map_err(|e| e.to_string())?;
     serde_json::to_value(sub).map_err(|e| e.to_string())
@@ -298,6 +374,22 @@ pub fn save_settings(state: State<'_, AppState>, settings: Value) -> Result<Valu
     } else {
         Err("Invalid settings".to_string())
     }
+}
+
+#[tauri::command]
+pub fn update_locale(app: tauri::AppHandle, state: State<'_, AppState>, locale: String) -> Result<Value, String> {
+    let locale = if locale.is_empty() { "zh-CN".to_string() } else { locale };
+    *state.locale.lock() = locale.clone();
+    let mut map = serde_json::Map::new();
+    map.insert("locale".to_string(), json!(locale));
+    state.db.lock().save_settings(&map).map_err(|e| e.to_string())?;
+    if let Some(tray) = state.tray.lock().as_ref() {
+        let menu = crate::build_tray_menu(&app, &locale).map_err(|e| e.to_string())?;
+        let _ = tray.set_menu(Some(menu));
+        let labels = crate::tray_labels(&locale);
+        let _ = tray.set_tooltip(Some(labels.tooltip));
+    }
+    Ok(json!({ "success": true, "locale": locale }))
 }
 
 // ===== Work Analysis =====
@@ -333,9 +425,10 @@ pub async fn llm_analyze_work(state: State<'_, AppState>, data: Value) -> Result
 }
 
 #[tauri::command]
-pub async fn llm_test(settings: Value) -> Result<Value, String> {
+pub async fn llm_test(state: State<'_, AppState>, settings: Value) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if settings["api_key"].as_str().map_or(true, |s| s.is_empty()) {
-        return Ok(json!({ "success": false, "error": "请先填写 API Key" }));
+        return Ok(json!({ "success": false, "error": t(&locale, "missing_api_key") }));
     }
     let llm = LLMHelper::new(&settings);
     match llm.test().await {
@@ -347,12 +440,13 @@ pub async fn llm_test(settings: Value) -> Result<Value, String> {
 // ===== Notification =====
 
 #[tauri::command]
-pub async fn test_notification(app: tauri::AppHandle) -> Result<Value, String> {
+pub async fn test_notification(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Value, String> {
+    let locale = current_locale(&state);
     use tauri_plugin_notification::NotificationExt;
     let _ = app.notification()
         .builder()
-        .title("TodoFloat 提醒")
-        .body("这是一条测试通知，如果你看到了说明提醒功能正常 ✔")
+        .title(t(&locale, "notification_title"))
+        .body(t(&locale, "notification_test_body"))
         .show();
     Ok(json!({ "success": true }))
 }
@@ -417,8 +511,9 @@ pub fn update_shortcuts(app: tauri::AppHandle, state: State<'_, AppState>, toggl
 
 #[tauri::command]
 pub fn quick_add(app: tauri::AppHandle, state: State<'_, AppState>, text: String, category: Option<String>, due_date: Option<String>) -> Result<Value, String> {
+    let locale = current_locale(&state);
     if !is_non_empty_string(&json!(text), 500) {
-        return Err("Invalid text".to_string());
+        return Err(t(&locale, "invalid_text"));
     }
     let trimmed = text.trim().to_string();
     let todo = state.db.lock().add_todo(&trimmed).map_err(|e| e.to_string())?;
@@ -443,6 +538,7 @@ pub fn close_quick_add(window: Window) -> Result<(), String> {
 #[tauri::command]
 pub async fn export_csv(app: tauri::AppHandle, state: State<'_, AppState>, filters: Value) -> Result<Value, String> {
     use tauri_plugin_dialog::DialogExt;
+    let locale = current_locale(&state);
     let export_type = filters.get("exportType").and_then(|v| v.as_str()).unwrap_or("active");
     let items = match export_type {
         "archived" => state.db.lock().get_archived(&filters).map_err(|e| e.to_string())?,
@@ -456,14 +552,15 @@ pub async fn export_csv(app: tauri::AppHandle, state: State<'_, AppState>, filte
     };
 
     if items.is_empty() {
-        return Ok(json!({ "success": false, "message": "没有可导出的数据" }));
+        return Ok(json!({ "success": false, "message": t(&locale, "no_data") }));
     }
 
     // Build CSV
-    let mut csv = String::from("﻿任务内容,状态,截止日期,类别,备注,创建时间,完成时间,归档时间\n");
+    let mut csv = String::from(t(&locale, "csv_header"));
     for item in &items {
-        let status = if item.completed == 1 { "已完成" } else { "待办" };
-        let category = item.category.as_deref().unwrap_or("未分类");
+        let status = if item.completed == 1 { t(&locale, "status_done") } else { t(&locale, "status_todo") };
+        let default_category = t(&locale, "category_uncategorized");
+        let category = item.category.as_deref().unwrap_or(default_category.as_str());
         let escape = |s: &str| format!("\"{}\"", s.replace('"', "\"\""));
         csv.push_str(&format!("{},{},{},{},{},{},{},{}\n",
             escape(&item.text),
@@ -482,7 +579,7 @@ pub async fn export_csv(app: tauri::AppHandle, state: State<'_, AppState>, filte
     let file_path = tokio::task::spawn_blocking(move || {
         app.dialog()
             .file()
-            .add_filter("CSV 文件", &["csv"])
+            .add_filter(t(&locale, "file_type_csv"), &["csv"])
             .set_file_name(&default_name)
             .blocking_save_file()
     }).await.map_err(|e| e.to_string())?;
@@ -591,13 +688,15 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub async fn backup_database(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Value, String> {
     use tauri_plugin_dialog::DialogExt;
+    let locale = current_locale(&state);
     let db_path = state.db.lock().get_db_path().clone();
     let default_name = format!("todo-app-backup-{}.db", chrono::Local::now().format("%Y-%m-%d"));
 
+    let dialog_locale = locale.clone();
     let file_path = tokio::task::spawn_blocking(move || {
         app.dialog()
             .file()
-            .add_filter("数据库文件", &["db"])
+            .add_filter(t(&dialog_locale, "file_type_db"), &["db"])
             .set_file_name(&default_name)
             .blocking_save_file()
     }).await.map_err(|e| e.to_string())?;
@@ -607,19 +706,21 @@ pub async fn backup_database(app: tauri::AppHandle, state: State<'_, AppState>) 
         std::fs::copy(&db_path, &path).map_err(|e| e.to_string())?;
         Ok(json!({ "success": true, "path": path.to_string_lossy() }))
     } else {
-        Ok(json!({ "success": false, "error": "用户取消" }))
+        Ok(json!({ "success": false, "error": t(&locale, "user_cancelled") }))
     }
 }
 
 #[tauri::command]
 pub async fn restore_database(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Value, String> {
     use tauri_plugin_dialog::DialogExt;
+    let locale = current_locale(&state);
     let db_path = state.db.lock().get_db_path().clone();
 
+    let dialog_locale = locale.clone();
     let file_path = tokio::task::spawn_blocking(move || {
         app.dialog()
             .file()
-            .add_filter("数据库文件", &["db"])
+            .add_filter(t(&dialog_locale, "file_type_db"), &["db"])
             .blocking_pick_file()
     }).await.map_err(|e| e.to_string())?;
 
@@ -632,7 +733,7 @@ pub async fn restore_database(app: tauri::AppHandle, state: State<'_, AppState>)
         state.db.lock().reopen().map_err(|e| e.to_string())?;
         Ok(json!({ "success": true }))
     } else {
-        Ok(json!({ "success": false, "error": "用户取消" }))
+        Ok(json!({ "success": false, "error": t(&locale, "user_cancelled") }))
     }
 }
 
@@ -668,9 +769,10 @@ pub async fn pomodoro_start(
     };
 
     // THEN acquire pomodoro lock
+    let locale = current_locale(&state);
     let mut inner = state.pomodoro.get_inner().await;
     if inner.is_running {
-        return Ok(json!({ "success": false, "error": "番茄钟已在运行" }));
+        return Ok(json!({ "success": false, "error": t(&locale, "pomodoro_already_running") }));
     }
 
     inner.start(task_id, task_text.clone(), focus_minutes * 60, session.id);
@@ -724,10 +826,11 @@ pub async fn pomodoro_resume(app: tauri::AppHandle, state: State<'_, AppState>) 
 
 #[tauri::command]
 pub async fn pomodoro_stop(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Value, String> {
+    let locale = current_locale(&state);
     let (session_id, actual_duration) = {
         let mut inner = state.pomodoro.get_inner().await;
         if !inner.is_running && !inner.is_paused {
-            return Ok(json!({ "success": false, "error": "没有正在运行的番茄钟" }));
+            return Ok(json!({ "success": false, "error": t(&locale, "pomodoro_not_running") }));
         }
         inner.stop()
     };

@@ -14,6 +14,8 @@ pub struct AppState {
     pub db: parking_lot::Mutex<Database>,
     pub pomodoro: PomodoroState,
     pub scale: parking_lot::Mutex<f64>,
+    pub locale: parking_lot::Mutex<String>,
+    pub tray: parking_lot::Mutex<Option<tauri::tray::TrayIcon>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -85,30 +87,31 @@ pub fn run() {
                 }
             }
 
-            let db = parking_lot::Mutex::new(Database::new(app.handle())?);
+            let db = Database::new(app.handle())?;
+            let locale = db
+                .get_settings_map()
+                .ok()
+                .and_then(|m| m.get("locale").and_then(|v| v.as_str()).map(|s| s.to_string()))
+                .unwrap_or_else(|| "zh-CN".to_string());
+            let db = parking_lot::Mutex::new(db);
             let pomodoro = PomodoroState::new();
             let scale = parking_lot::Mutex::new(1.0);
-            app.manage(AppState { db, pomodoro, scale });
+            app.manage(AppState {
+                db,
+                pomodoro,
+                scale,
+                locale: parking_lot::Mutex::new(locale.clone()),
+                tray: parking_lot::Mutex::new(None),
+            });
 
             // Build tray menu
-            let show_todo = MenuItemBuilder::with_id("show_todo", "待办清单").build(app)?;
-            let show_archive = MenuItemBuilder::with_id("show_archive", "历史归档").build(app)?;
-            let separator = tauri::menu::PredefinedMenuItem::separator(app)?;
-            let show_settings = MenuItemBuilder::with_id("show_settings", "设置").build(app)?;
-            let quit = MenuItemBuilder::with_id("quit", "退出").build(app)?;
-
-            let menu = MenuBuilder::new(app)
-                .item(&show_todo)
-                .item(&show_archive)
-                .item(&separator)
-                .item(&show_settings)
-                .item(&quit)
-                .build()?;
+            let menu = build_tray_menu(&app.app_handle(), &locale)?;
+            let labels = tray_labels(&locale);
 
             // Create tray icon
-            let _tray = TrayIconBuilder::new()
+            let tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("TodoFloat - 待办清单")
+                .tooltip(labels.tooltip)
                 .menu(&menu)
                 .on_menu_event(|app, event| {
                     match event.id().as_ref() {
@@ -146,6 +149,7 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+            *app.state::<AppState>().tray.lock() = Some(tray);
 
             // Register global shortcuts with logging
             {
@@ -238,6 +242,7 @@ pub fn run() {
             commands::update_subtask_text,
             commands::get_settings,
             commands::save_settings,
+            commands::update_locale,
             commands::get_work_analysis,
             commands::llm_categorize,
             commands::llm_analyze_work,
@@ -357,4 +362,52 @@ fn start_pomodoro_ticking(handle: &tauri::AppHandle) {
             commands::broadcast_pomodoro_state(&handle).await;
         }
     });
+}
+
+pub(crate) struct TrayLabels {
+    pub show_todo: &'static str,
+    pub show_archive: &'static str,
+    pub show_settings: &'static str,
+    pub quit: &'static str,
+    pub tooltip: &'static str,
+}
+
+pub(crate) fn tray_labels(locale: &str) -> TrayLabels {
+    if locale == "zh-CN" {
+        TrayLabels {
+            show_todo: "待办清单",
+            show_archive: "历史归档",
+            show_settings: "设置",
+            quit: "退出",
+            tooltip: "TodoFloat - 待办清单",
+        }
+    } else {
+        TrayLabels {
+            show_todo: "Todo List",
+            show_archive: "Archive",
+            show_settings: "Settings",
+            quit: "Quit",
+            tooltip: "TodoFloat",
+        }
+    }
+}
+
+pub(crate) fn build_tray_menu<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    locale: &str,
+) -> Result<tauri::menu::Menu<R>, tauri::Error> {
+    let labels = tray_labels(locale);
+    let show_todo = MenuItemBuilder::with_id("show_todo", labels.show_todo).build(app)?;
+    let show_archive = MenuItemBuilder::with_id("show_archive", labels.show_archive).build(app)?;
+    let separator = tauri::menu::PredefinedMenuItem::separator(app)?;
+    let show_settings = MenuItemBuilder::with_id("show_settings", labels.show_settings).build(app)?;
+    let quit = MenuItemBuilder::with_id("quit", labels.quit).build(app)?;
+
+    MenuBuilder::new(app)
+        .item(&show_todo)
+        .item(&show_archive)
+        .item(&separator)
+        .item(&show_settings)
+        .item(&quit)
+        .build()
 }

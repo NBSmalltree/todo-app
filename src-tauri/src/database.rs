@@ -260,6 +260,7 @@ impl Database {
         // Seed default settings
         let defaults = [
             ("theme", "\"light\""),
+            ("locale", "\"zh-CN\""),
             ("shortcut_toggle", if cfg!(target_os = "macos") { "\"Cmd+Shift+T\"" } else { "\"Ctrl+Shift+T\"" }),
             ("shortcut_quickadd", if cfg!(target_os = "macos") { "\"Cmd+Shift+Space\"" } else { "\"Ctrl+Shift+Space\"" }),
         ];
