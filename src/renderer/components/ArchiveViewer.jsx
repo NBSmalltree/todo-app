@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 import api from '../api';
+import { useI18n } from '../i18n';
 import CustomSelect from './CustomSelect';
 
 export default function ArchiveViewer() {
+  const { t } = useI18n();
   const [archives, setArchives] = useState([]);
   const [categories, setCategories] = useState([]);
   const [filters, setFilters] = useState({
@@ -120,7 +122,7 @@ export default function ArchiveViewer() {
       timeoutId,
     });
   };
-  
+
   const handleNoteDoubleClick = (item) => {
     setEditingNote(item.id);
     setNoteText(item.note || '');
@@ -187,7 +189,7 @@ export default function ArchiveViewer() {
       await api.deleteTodo(id);
       await loadArchives();
       await loadCategories();
-      showUndoToast('已删除', () => api.recoverTodo(id));
+      showUndoToast(t('archive.undoDelete'), () => api.recoverTodo(id));
     } catch (error) {
       console.error('Failed to delete:', error);
     }
@@ -211,13 +213,13 @@ export default function ArchiveViewer() {
         exportType,
       });
       if (result?.success) {
-        showToast(`导出成功：${result.filePath}`, 'success');
+        showToast(t('archive.exportSuccess', { filePath: result.filePath }), 'success');
       } else if (result?.message) {
         showToast(result.message, 'info');
       }
     } catch (error) {
       console.error('Failed to export:', error);
-      showToast('导出失败', 'error');
+      showToast(t('archive.exportFailed'), 'error');
     } finally {
       setIsExporting(false);
     }
@@ -260,7 +262,7 @@ export default function ArchiveViewer() {
               onClick={undoToast.undoAction}
               className="font-medium text-sky-300 hover:text-sky-200 transition-colors"
             >
-              撤销
+              {t('archive.undo')}
             </button>
           </div>
         </div>
@@ -271,25 +273,25 @@ export default function ArchiveViewer() {
         <div className="flex flex-wrap gap-3 items-end">
           {/* Search */}
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs text-gray-500 mb-1">搜索</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('archive.search')}</label>
             <input
               type="text"
               ref={searchInputRef}
               value={searchInputValue}
               onChange={(e) => setSearchInputValue(e.target.value)}
-              placeholder="搜索任务或备注..."
+              placeholder={t('archive.searchPlaceholder')}
               className="w-full px-3 py-1.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
             />
           </div>
 
           {/* Category Filter */}
           <div className="min-w-[140px]">
-            <label className="block text-xs text-gray-500 mb-1">类别</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('archive.category')}</label>
             <CustomSelect
               value={filters.category}
               onChange={(val) => handleFilterChange('category', val)}
               options={[
-                { value: 'all', label: '全部类别' },
+                { value: 'all', label: t('archive.categoryAll') },
                 ...categories.map((cat) => ({ value: cat, label: cat })),
               ]}
             />
@@ -297,7 +299,7 @@ export default function ArchiveViewer() {
 
           {/* Date Range */}
           <div className="min-w-[140px]">
-            <label className="block text-xs text-gray-500 mb-1">开始日期</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('archive.startDate')}</label>
             <input
               type="date"
               value={filters.startDate}
@@ -307,7 +309,7 @@ export default function ArchiveViewer() {
           </div>
 
           <div className="min-w-[140px]">
-            <label className="block text-xs text-gray-500 mb-1">结束日期</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('archive.endDate')}</label>
             <input
               type="date"
               value={filters.endDate}
@@ -321,7 +323,7 @@ export default function ArchiveViewer() {
             onClick={handleClearFilters}
             className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
-            重置
+            {t('archive.reset')}
           </button>
 
           {/* Select Mode Toggle */}
@@ -336,7 +338,7 @@ export default function ArchiveViewer() {
                 : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
             }`}
           >
-            {selectMode ? '取消' : '选择'}
+            {selectMode ? t('archive.cancel') : t('archive.select')}
           </button>
 
           {/* Export */}
@@ -345,9 +347,9 @@ export default function ArchiveViewer() {
               value={exportType}
               onChange={(val) => setExportType(val)}
               options={[
-                { value: 'archived', label: '归档任务' },
-                { value: 'active', label: '待办任务' },
-                { value: 'all', label: '全部任务' },
+                { value: 'archived', label: t('archive.exportTypeArchived') },
+                { value: 'active', label: t('archive.exportTypeActive') },
+                { value: 'all', label: t('archive.exportTypeAll') },
               ]}
             />
             <button
@@ -355,7 +357,7 @@ export default function ArchiveViewer() {
               disabled={isExporting}
               className="px-3 py-1.5 text-sm text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isExporting ? '导出中...' : '导出 CSV'}
+              {isExporting ? t('archive.exporting') : t('archive.exportCSV')}
             </button>
           </div>
         </div>
@@ -378,7 +380,7 @@ export default function ArchiveViewer() {
               className="w-4 h-4 rounded border-gray-300 text-sky-500 focus:ring-sky-200 cursor-pointer"
             />
             <span className="text-xs text-sky-700 font-medium">
-              {selectedIds.size > 0 ? `已选 ${selectedIds.size} 项` : '全选'}
+              {selectedIds.size > 0 ? t('archive.selectedCount', { count: selectedIds.size }) : t('archive.selectAll')}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -394,7 +396,7 @@ export default function ArchiveViewer() {
               disabled={selectedIds.size === 0}
               className="px-2 py-1 text-xs text-green-600 bg-green-50 rounded hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              批量恢复
+              {t('archive.batchRestore')}
             </button>
             <button
               onClick={async () => {
@@ -405,7 +407,7 @@ export default function ArchiveViewer() {
                 setSelectedIds(new Set());
                 await loadArchives();
                 await loadCategories();
-                showUndoToast(`已删除 ${ids.length} 项`, async () => {
+                showUndoToast(t('archive.batchDeleteSuccess', { count: ids.length }), async () => {
                   for (const id of ids) await api.recoverTodo(id);
                   await loadArchives();
                   await loadCategories();
@@ -414,7 +416,7 @@ export default function ArchiveViewer() {
               disabled={selectedIds.size === 0}
               className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              批量删除
+              {t('archive.batchDelete')}
             </button>
           </div>
         </div>
@@ -432,7 +434,7 @@ export default function ArchiveViewer() {
               <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
               <path d="M8 2h8v4H8z" />
             </svg>
-            <span className="text-sm mt-2">暂无归档记录</span>
+            <span className="text-sm mt-2">{t('archive.noRecords')}</span>
           </div>
         ) : (
           <div className="overflow-auto h-full">
@@ -456,22 +458,22 @@ export default function ArchiveViewer() {
                     </th>
                   )}
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    任务内容
+                    {t('archive.headerTaskContent')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    截止日期
+                    {t('archive.headerDueDate')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    类别
+                    {t('archive.headerCategory')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    备注
+                    {t('archive.headerNote')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    归档时间
+                    {t('archive.headerArchivedAt')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    操作
+                    {t('archive.headerActions')}
                   </th>
                 </tr>
               </thead>
@@ -517,7 +519,7 @@ export default function ArchiveViewer() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700">
-                        {item.category || '未分类'}
+                        {item.category || t('archive.uncategorized')}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -531,22 +533,22 @@ export default function ArchiveViewer() {
                             onBlur={() => handleSaveNote(item.id)}
                             autoFocus
                             className="flex-1 px-2 py-1 text-sm bg-gray-50 rounded border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
-                            placeholder="输入备注..."
+                            placeholder={t('archive.notePlaceholder')}
                           />
                           <button
                             onClick={() => handleSaveNote(item.id)}
                             className="px-2 py-1 text-xs bg-sky-500 text-white rounded hover:bg-sky-600 transition-colors"
                           >
-                            保存
+                            {t('archive.save')}
                           </button>
                         </div>
                       ) : (
                         <span
                           onDoubleClick={() => handleNoteDoubleClick(item)}
                           className="text-sm text-gray-500 cursor-pointer hover:text-gray-700 transition-colors"
-                          title="双击编辑备注"
+                          title={t('archive.noteTitle')}
                         >
-                          {item.note || '双击添加备注...'}
+                          {item.note || t('archive.noteEmpty')}
                         </span>
                       )}
                     </td>
@@ -559,30 +561,30 @@ export default function ArchiveViewer() {
                           onClick={() => handleCategorize(item)}
                           disabled={categorizingId === item.id}
                           className="px-2 py-1 text-xs text-sky-600 bg-sky-50 rounded hover:bg-sky-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="使用AI自动分类"
+                          title={t('archive.aiCategorizeTitle')}
                         >
                           {categorizingId === item.id ? (
                             <span className="flex items-center gap-1">
                               <div className="animate-spin rounded-full h-3 w-3 border-b border-sky-600" />
-                              分类中
+                              {t('archive.aiCategorizing')}
                             </span>
                           ) : (
-                            'AI分类'
+                            t('archive.aiCategorize')
                           )}
                         </button>
                         <button
                           onClick={() => handleRestore(item.id)}
                           className="px-2 py-1 text-xs text-green-600 bg-green-50 rounded hover:bg-green-100 transition-colors"
-                          title="恢复为待办"
+                          title={t('archive.restoreTitle')}
                         >
-                          恢复
+                          {t('archive.restore')}
                         </button>
                         <button
                           onClick={() => handleDelete(item.id)}
                           className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded hover:bg-red-100 transition-colors"
-                          title="删除此记录"
+                          title={t('archive.deleteTitle')}
                         >
-                          删除
+                          {t('archive.delete')}
                         </button>
                       </div>
                     </td>
@@ -596,7 +598,7 @@ export default function ArchiveViewer() {
 
       {/* Footer */}
       <div className="mt-4 text-xs text-gray-400 text-center">
-        共 {archives.length} 条归档记录
+        {t('archive.totalRecords', { count: archives.length })}
       </div>
     </div>
   );
