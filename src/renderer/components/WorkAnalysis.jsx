@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useI18n } from '../i18n';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -9,11 +10,14 @@ import ReactMarkdown from 'react-markdown';
 
 const COLORS = ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd', '#e0f2fe', '#0284c7', '#0369a1', '#075985'];
 
+const ANALYSIS_FAILED = '__ANALYSIS_FAILED__';
+
 // Module-level cache survives component mount/unmount (e.g. tab switches)
 const _cache = {};
 let _version = 0;
 
 export default function WorkAnalysis() {
+  const { t } = useI18n();
   const [period, setPeriod] = useState('week');
   const [analysis, setAnalysis] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -96,12 +100,12 @@ export default function WorkAnalysis() {
     setLlmLoading(true);
     try {
       const tip = await api.analyzeWork(data);
-      const displayTip = tip || '暂无分析';
+      const displayTip = tip || t('workAnalysis.ai.noAnalysis');
       setLlmTip(displayTip);
       // Save to module-level cache (survives tab switches)
       _cache[period] = { tip: displayTip, version: _version };
     } catch (e) {
-      setLlmTip('分析生成失败');
+      setLlmTip(ANALYSIS_FAILED);
     } finally {
       setLlmLoading(false);
     }
@@ -115,9 +119,9 @@ export default function WorkAnalysis() {
 
   const getPeriodLabel = () => {
     switch (period) {
-      case 'week': return '本周';
-      case 'month': return '本月';
-      case 'year': return '本年';
+      case 'week': return t('workAnalysis.period.week');
+      case 'month': return t('workAnalysis.period.month');
+      case 'year': return t('workAnalysis.period.year');
       default: return '';
     }
   };
@@ -166,8 +170,8 @@ export default function WorkAnalysis() {
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <path d="M18 20V10M12 20V4M6 20v-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <span className="text-sm mt-4">暂无{getPeriodLabel()}的工作数据</span>
-        <span className="text-xs mt-1 text-gray-300">归档任务或使用番茄钟后即可查看分析</span>
+        <span className="text-sm mt-4">{t('workAnalysis.empty.title', { period: getPeriodLabel() })}</span>
+        <span className="text-xs mt-1 text-gray-300">{t('workAnalysis.empty.subtitle')}</span>
       </div>
     );
   }
@@ -195,7 +199,7 @@ export default function WorkAnalysis() {
                 : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
             }`}
           >
-            {p === 'week' ? '本周' : p === 'month' ? '本月' : '本年'}
+            {p === 'week' ? t('workAnalysis.period.week') : p === 'month' ? t('workAnalysis.period.month') : t('workAnalysis.period.year')}
           </button>
         ))}
       </div>
@@ -204,19 +208,19 @@ export default function WorkAnalysis() {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="text-2xl font-bold text-sky-600">{analysis.completionStats?.active || 0}</div>
-          <div className="text-sm text-gray-500 mt-1">待办任务</div>
+          <div className="text-sm text-gray-500 mt-1">{t('workAnalysis.summary.activeTasks')}</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="text-2xl font-bold text-sky-600">{analysis.totalItems}</div>
-          <div className="text-sm text-gray-500 mt-1">归档任务</div>
+          <div className="text-sm text-gray-500 mt-1">{t('workAnalysis.summary.archivedTasks')}</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="text-2xl font-bold text-sky-600">{Object.keys(analysis.categoryDistribution).length}</div>
-          <div className="text-sm text-gray-500 mt-1">工作类别</div>
+          <div className="text-sm text-gray-500 mt-1">{t('workAnalysis.summary.categories')}</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="text-2xl font-bold text-sky-600">{completionRate}%</div>
-          <div className="text-sm text-gray-500 mt-1">归档率</div>
+          <div className="text-sm text-gray-500 mt-1">{t('workAnalysis.summary.completionRate')}</div>
         </div>
       </div>
 
@@ -224,7 +228,7 @@ export default function WorkAnalysis() {
       <div className="grid grid-cols-2 gap-4 mb-6">
         {/* Category Distribution Pie Chart */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-4">工作类别分布</h3>
+          <h3 className="text-sm font-medium text-gray-700 mb-4">{t('workAnalysis.charts.categoryDistribution')}</h3>
           <div className="h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -250,7 +254,7 @@ export default function WorkAnalysis() {
 
         {/* Daily Distribution Bar Chart */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-4">每日任务分布</h3>
+          <h3 className="text-sm font-medium text-gray-700 mb-4">{t('workAnalysis.charts.dailyDistribution')}</h3>
           <div className="h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailyData}>
@@ -267,7 +271,7 @@ export default function WorkAnalysis() {
 
       {/* Category Details */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <h3 className="text-sm font-medium text-gray-700 mb-4">各类别详情</h3>
+        <h3 className="text-sm font-medium text-gray-700 mb-4">{t('workAnalysis.categoryDetails.title')}</h3>
         <div className="space-y-3">
           {Object.entries(analysis.categoryDistribution)
             .sort(([, a], [, b]) => b.count - a.count)
@@ -280,7 +284,7 @@ export default function WorkAnalysis() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium text-gray-700">{category}</span>
-                    <span className="text-sm text-gray-500">{data.count} 项</span>
+                    <span className="text-sm text-gray-500">{t('workAnalysis.categoryDetails.count', { count: data.count })}</span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2">
                     <div
@@ -302,12 +306,12 @@ export default function WorkAnalysis() {
         <div className="mt-6 bg-rose-50 rounded-xl border border-rose-100 p-4">
           <div className="flex items-center gap-2 mb-4">
             <span className="text-lg">🍅</span>
-            <h3 className="text-sm font-medium text-rose-700">番茄统计</h3>
+            <h3 className="text-sm font-medium text-rose-700">{t('workAnalysis.pomodoro.title')}</h3>
           </div>
           {pomodoroLoading ? (
             <div className="flex items-center gap-2 text-rose-400">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-rose-400" />
-              <span className="text-xs">加载中...</span>
+              <span className="text-xs">{t('workAnalysis.loading')}</span>
             </div>
           ) : (
             <>
@@ -315,18 +319,18 @@ export default function WorkAnalysis() {
               <div className="grid grid-cols-3 gap-2 mb-4">
                 <div className="bg-white rounded-lg border border-rose-100 p-2.5 text-center">
                   <div className="text-2xl font-bold text-rose-500 leading-none">{pomodoroStats.todaySessions}</div>
-                  <div className="text-[10px] text-rose-400 mt-1.5">今日完成</div>
+                  <div className="text-[10px] text-rose-400 mt-1.5">{t('workAnalysis.pomodoro.todayCompleted')}</div>
                 </div>
                 <div className="bg-white rounded-lg border border-rose-100 p-2.5 text-center">
                   <div className="text-2xl font-bold text-rose-500 leading-none">{pomodoroStats.totalSessions}</div>
-                  <div className="text-[10px] text-rose-400 mt-1.5">{getPeriodLabel()}完成</div>
+                  <div className="text-[10px] text-rose-400 mt-1.5">{t('workAnalysis.pomodoro.periodCompleted', { period: getPeriodLabel() })}</div>
                 </div>
                 <div className="bg-white rounded-lg border border-rose-100 p-2.5 text-center">
                   <div className="text-2xl font-bold text-rose-500 leading-none">
                     {pomodoroStats.totalFocusMinutes}
-                    <span className="text-xs font-normal text-rose-400 ml-0.5">分</span>
+                    <span className="text-xs font-normal text-rose-400 ml-0.5">{t('workAnalysis.pomodoro.minutes')}</span>
                   </div>
-                  <div className="text-[10px] text-rose-400 mt-1.5">总专注</div>
+                  <div className="text-[10px] text-rose-400 mt-1.5">{t('workAnalysis.pomodoro.totalFocus')}</div>
                 </div>
               </div>
 
@@ -348,16 +352,16 @@ export default function WorkAnalysis() {
               {/* Recent sessions */}
               {pomodoroStats.recentSessions && pomodoroStats.recentSessions.length > 0 && (
                 <div>
-                  <h4 className="text-[11px] font-medium text-rose-600 mb-2">最近记录</h4>
+                  <h4 className="text-[11px] font-medium text-rose-600 mb-2">{t('workAnalysis.pomodoro.recentRecords')}</h4>
                   <div className="space-y-1 max-h-[150px] overflow-y-auto">
                     {pomodoroStats.recentSessions.map((s) => {
                       const seconds = s.actualDuration || 0;
                       const durationText = seconds < 60
-                        ? `${seconds}秒`
-                        : `${Math.round(seconds / 60)}分`;
-                      const cycleLabel = s.cycleType === 'focus' ? '专注'
-                        : s.cycleType === 'short_break' ? '短休息'
-                        : s.cycleType === 'long_break' ? '长休息'
+                        ? t('workAnalysis.pomodoro.durationSeconds', { seconds })
+                        : t('workAnalysis.pomodoro.durationMinutes', { minutes: Math.round(seconds / 60) });
+                      const cycleLabel = s.cycleType === 'focus' ? t('workAnalysis.pomodoro.focus')
+                        : s.cycleType === 'short_break' ? t('workAnalysis.pomodoro.shortBreak')
+                        : s.cycleType === 'long_break' ? t('workAnalysis.pomodoro.longBreak')
                         : s.cycleType;
                       return (
                         <div key={s.id} className="flex items-center gap-2 text-[11px]">
@@ -388,41 +392,41 @@ export default function WorkAnalysis() {
             </svg>
             <div className="text-sm text-sky-700 flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <p className="font-medium">AI 工作分析</p>
-                {!llmLoading && llmTip && llmTip !== '分析生成失败' && (
-                  <span className="text-[10px] text-sky-400 bg-white/60 px-1.5 py-0.5 rounded">已缓存</span>
+                <p className="font-medium">{t('workAnalysis.ai.title')}</p>
+                {!llmLoading && llmTip && llmTip !== ANALYSIS_FAILED && (
+                  <span className="text-[10px] text-sky-400 bg-white/60 px-1.5 py-0.5 rounded">{t('workAnalysis.ai.cached')}</span>
                 )}
               </div>
-              {llmLoading ? (
+                {llmLoading ? (
                 <div className="flex items-center gap-2 text-sky-500">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500" />
-                  <span>正在分析中...</span>
+                  <span>{t('workAnalysis.ai.analyzing')}</span>
                 </div>
-              ) : llmTip === '分析生成失败' ? (
+              ) : llmTip === ANALYSIS_FAILED ? (
                 <div className="flex flex-col items-start gap-2">
-                  <span className="text-sky-600">分析生成失败</span>
+                  <span className="text-sky-600">{t('workAnalysis.ai.analysisFailed')}</span>
                   <button
                     onClick={handleRegenerate}
                     className="px-3 py-1 text-xs text-sky-600 bg-sky-50 rounded hover:bg-sky-100 transition-colors"
                   >
-                    重新生成
+                    {t('workAnalysis.ai.regenerate')}
                   </button>
                 </div>
               ) : llmTip ? (
                 <ReactMarkdown>{llmTip}</ReactMarkdown>
               ) : !analysis || analysis.totalItems === 0 ? (
-                <span className="text-sky-400 text-xs">暂无数据，归档任务后可生成分析</span>
+                <span className="text-sky-400 text-xs">{t('workAnalysis.ai.noData')}</span>
               ) : null}
             </div>
           </div>
           {/* Regenerate button always visible when content exists */}
-          {!llmLoading && llmTip && llmTip !== '分析生成失败' && (
+          {!llmLoading && llmTip && llmTip !== ANALYSIS_FAILED && (
             <button
               onClick={handleRegenerate}
               className="flex-shrink-0 px-2.5 py-1 text-[11px] text-sky-500 bg-white/70 rounded-lg hover:bg-white hover:text-sky-600 transition-colors border border-sky-200/50"
-              title="重新生成分析"
+              title={t('workAnalysis.ai.regenerateTooltip')}
             >
-              重新生成
+              {t('workAnalysis.ai.regenerate')}
             </button>
           )}
         </div>
