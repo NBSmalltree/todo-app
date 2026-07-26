@@ -320,14 +320,20 @@ fn start_reminder_polling(handle: &tauri::AppHandle) {
                 if reminded_ids.contains(&task.id) { continue; }
                 reminded_ids.insert(task.id);
 
+                let locale = {
+                    let state = handle.state::<AppState>();
+                    let locale = state.locale.lock().clone();
+                    locale
+                };
+
                 let body = task.due_date.as_ref().map_or(
-                    format!("任务「{}」已到期", task.text),
-                    |d| format!("任务「{}」将于 {} 到期", task.text, d),
+                    format_due_now(&locale, &task.text),
+                    |d| format_due_soon(&locale, &task.text, d),
                 );
 
                 use tauri_plugin_notification::NotificationExt;
                 let _ = handle.notification().builder()
-                    .title("TodoFloat 提醒")
+                    .title(notification_title(&locale))
                     .body(&body)
                     .show();
             }
@@ -410,4 +416,28 @@ pub(crate) fn build_tray_menu<R: tauri::Runtime>(
         .item(&show_settings)
         .item(&quit)
         .build()
+}
+
+fn t(locale: &str, zh: &'static str, en: &'static str) -> &'static str {
+    if locale == "en-US" { en } else { zh }
+}
+
+fn notification_title(locale: &str) -> &'static str {
+    t(locale, "TodoFloat 提醒", "TodoFloat Reminder")
+}
+
+fn format_due_now(locale: &str, task: &str) -> String {
+    if locale == "en-US" {
+        format!("Task \"{}\" is due", task)
+    } else {
+        format!("任务「{}」已到期", task)
+    }
+}
+
+fn format_due_soon(locale: &str, task: &str, due_date: &str) -> String {
+    if locale == "en-US" {
+        format!("Task \"{}\" is due at {}", task, due_date)
+    } else {
+        format!("任务「{}」将于 {} 到期", task, due_date)
+    }
 }
