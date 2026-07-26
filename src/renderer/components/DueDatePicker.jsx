@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useI18n } from '../i18n';
 
 // 工具函数：把后端存储的 due_date 解析为 {date, hour, minute}
 function parseDueDate(str) {
@@ -54,8 +55,6 @@ function weekdayOf(dateStr) {
   return new Date(y, m - 1, d).getDay();
 }
 
-const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
-
 // 月历网格生成：返回 6*7=42 个格子（带前后月填充）
 function buildMonthGrid(year, month) {
   const first = new Date(year, month - 1, 1);
@@ -89,6 +88,16 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) => i);
 
 export default function DueDatePicker({ value, onChange, onClose }) {
+  const { t } = useI18n();
+  const weekLabels = [
+    t('dueDate.weekday.short.sun'),
+    t('dueDate.weekday.short.mon'),
+    t('dueDate.weekday.short.tue'),
+    t('dueDate.weekday.short.wed'),
+    t('dueDate.weekday.short.thu'),
+    t('dueDate.weekday.short.fri'),
+    t('dueDate.weekday.short.sat'),
+  ];
   const initial = parseDueDate(value) || { date: todayStr(), hour: 23, minute: 59 };
   const [selectedDate, setSelectedDate] = useState(initial.date);
   const [hour, setHour] = useState(initial.hour);
@@ -135,10 +144,10 @@ export default function DueDatePicker({ value, onChange, onClose }) {
 
   // 预设：今天 23:59 / 明天 12:00 / 后天 12:00 / 下周一 09:00
   const presets = [
-    { label: '今天', offset: 0, h: 23, m: 59 },
-    { label: '明天', offset: 1, h: 12, m: 0 },
-    { label: '后天', offset: 2, h: 12, m: 0 },
-    { label: '下周', offset: null, h: 9, m: 0, isNextWeek: true },
+    { label: t('dueDate.preset.today'), offset: 0, h: 23, m: 59 },
+    { label: t('dueDate.preset.tomorrow'), offset: 1, h: 12, m: 0 },
+    { label: t('dueDate.preset.dayAfterTomorrow'), offset: 2, h: 12, m: 0 },
+    { label: t('dueDate.preset.nextWeek'), offset: null, h: 9, m: 0, isNextWeek: true },
   ];
 
   const applyPreset = (preset) => {
@@ -185,9 +194,13 @@ export default function DueDatePicker({ value, onChange, onClose }) {
   const formatDisplay = (h, m) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
   const selectedLabel = useMemo(() => {
-    const wd = WEEK_LABELS[weekdayOf(selectedDate)];
-    return `${selectedDate} 周${wd} ${formatDisplay(hour, minute)}`;
-  }, [selectedDate, hour, minute]);
+    const wd = weekLabels[weekdayOf(selectedDate)];
+    return t('dueDate.selectedLabel', {
+      date: selectedDate,
+      weekday: wd,
+      time: formatDisplay(hour, minute),
+    });
+  }, [selectedDate, hour, minute, t, weekLabels]);
 
   return (
     <div
@@ -216,20 +229,20 @@ export default function DueDatePicker({ value, onChange, onClose }) {
           type="button"
           onClick={goPrevMonth}
           className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded transition-colors"
-          title="上一月"
+          title={t('dueDate.month.prevMonth')}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
         <div className="text-xs font-semibold text-gray-700">
-          {viewYear}年{String(viewMonth).padStart(2, '0')}月
+          {t('dueDate.month.display', { year: viewYear, month: String(viewMonth).padStart(2, '0') })}
         </div>
         <button
           type="button"
           onClick={goNextMonth}
           className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded transition-colors"
-          title="下一月"
+          title={t('dueDate.month.nextMonth')}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M9 6l6 6-6 6" />
@@ -239,7 +252,7 @@ export default function DueDatePicker({ value, onChange, onClose }) {
 
       {/* 周标题 */}
       <div className="grid grid-cols-7 gap-0.5 mb-0.5">
-        {WEEK_LABELS.map((w) => (
+        {weekLabels.map((w) => (
           <div key={w} className="h-5 flex items-center justify-center text-[10px] text-gray-400 font-medium">
             {w}
           </div>
@@ -291,7 +304,7 @@ export default function DueDatePicker({ value, onChange, onClose }) {
         >
           {HOUR_OPTIONS.map((h) => (
             <option key={h} value={h}>
-              {String(h).padStart(2, '0')} 时
+              {t('dueDate.time.hourOption', { value: String(h).padStart(2, '0') })}
             </option>
           ))}
         </select>
@@ -303,7 +316,7 @@ export default function DueDatePicker({ value, onChange, onClose }) {
         >
           {MINUTE_OPTIONS.map((m) => (
             <option key={m} value={m}>
-              {String(m).padStart(2, '0')} 分
+              {t('dueDate.time.minuteOption', { value: String(m).padStart(2, '0') })}
             </option>
           ))}
         </select>
@@ -317,7 +330,7 @@ export default function DueDatePicker({ value, onChange, onClose }) {
           onClick={handleClear}
           className="text-[11px] text-gray-400 hover:text-red-500 transition-colors px-1.5"
         >
-          清除
+          {t('dueDate.clear')}
         </button>
       </div>
     </div>
