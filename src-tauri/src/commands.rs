@@ -390,6 +390,7 @@ pub fn update_locale(app: tauri::AppHandle, state: State<'_, AppState>, locale: 
         let labels = crate::tray_labels(&locale);
         let _ = tray.set_tooltip(Some(labels.tooltip));
     }
+    let _ = app.emit("locale-changed", &locale);
     Ok(json!({ "success": true, "locale": locale }))
 }
 

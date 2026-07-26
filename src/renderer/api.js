@@ -37,6 +37,7 @@ const api = {
   // ===== Settings =====
   getSettings: () => invoke('get_settings'),
   saveSettings: (settings) => invoke('save_settings', { settings }),
+  updateLocale: (locale) => invoke('update_locale', { locale }),
 
   // ===== Shortcuts =====
   getShortcuts: () => invoke('get_shortcuts'),
@@ -99,6 +100,11 @@ const api = {
   },
   onThemeChanged: (callback) => {
     return listen('theme-changed', (event) => {
+      callback(event.payload);
+    });
+  },
+  onLocaleChanged: (callback) => {
+    return listen('locale-changed', (event) => {
       callback(event.payload);
     });
   },

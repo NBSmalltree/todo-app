@@ -46,14 +46,23 @@ export default function I18nProvider({ children }) {
     document.documentElement.lang = locale;
   }, [locale]);
 
+  useEffect(() => {
+    let unlisten;
+    api.onLocaleChanged((payload) => {
+      const next = resolveLocale(payload);
+      setLocaleState(next);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
+
   const setLocale = useCallback((next) => {
     const resolved = resolveLocale(next);
     setLocaleState(resolved);
-    try {
-      api.saveSettings({ locale: resolved });
-    } catch (e) {
-      // ignore
-    }
+    api.updateLocale(resolved).catch(() => {});
   }, []);
 
   const t = useMemo(() => createTranslation(locale, dictionaries), [locale]);

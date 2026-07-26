@@ -9,14 +9,18 @@ export function createTranslation(locale, dictionaries = {}) {
   const dictionary = dictionaries[locale] || {};
 
   return function t(key, vars = {}) {
-    const parts = key.split('.');
-    let value = dictionary;
-    for (const part of parts) {
-      if (value && typeof value === 'object' && part in value) {
-        value = value[part];
-      } else {
-        value = undefined;
-        break;
+    let value = dictionary[key];
+
+    if (value === undefined && dictionary && typeof dictionary === 'object') {
+      const parts = key.split('.');
+      value = dictionary;
+      for (const part of parts) {
+        if (value && typeof value === 'object' && part in value) {
+          value = value[part];
+        } else {
+          value = undefined;
+          break;
+        }
       }
     }
 
