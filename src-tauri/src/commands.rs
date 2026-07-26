@@ -183,6 +183,7 @@ pub async fn archive_todo(app: tauri::AppHandle, state: State<'_, AppState>, id:
     if todo.category.is_none() {
         let todo_clone = todo.clone();
         let app_clone = app.clone();
+        let locale = current_locale(&state);
         tokio::spawn(async move {
             let settings = {
                 let st = app_clone.state::<AppState>();
@@ -192,7 +193,7 @@ pub async fn archive_todo(app: tauri::AppHandle, state: State<'_, AppState>, id:
             if let Some(api_key) = settings.get("api_key").and_then(|v| v.as_str()) {
                 if !api_key.is_empty() {
                     let settings_value = Value::Object(settings.clone());
-                    let llm = LLMHelper::new(&settings_value);
+                    let llm = LLMHelper::new(&settings_value, &locale);
                     if let Ok(category) = llm.categorize(&todo_clone.text).await {
                         let st = app_clone.state::<AppState>();
                         let _ = st.db.lock().update_category(todo_clone.id, Some(&category));
@@ -398,7 +399,8 @@ pub fn update_locale(app: tauri::AppHandle, state: State<'_, AppState>, locale: 
 pub fn get_work_analysis(state: State<'_, AppState>, period: String) -> Result<Value, String> {
     let valid = ["week", "month", "year"];
     let p = if valid.contains(&period.as_str()) { &period } else { "week" };
-    let analysis = state.db.lock().get_work_analysis(p).map_err(|e| e.to_string())?;
+    let locale = current_locale(&state);
+    let analysis = state.db.lock().get_work_analysis(p, Some(&locale)).map_err(|e| e.to_string())?;
     serde_json::to_value(analysis).map_err(|e| e.to_string())
 }
 
@@ -406,21 +408,23 @@ pub fn get_work_analysis(state: State<'_, AppState>, period: String) -> Result<V
 
 #[tauri::command]
 pub async fn llm_categorize(state: State<'_, AppState>, text: String) -> Result<Option<String>, String> {
+    let locale = current_locale(&state);
     let settings = state.db.lock().get_settings_map().map_err(|e| e.to_string())?;
     if settings.get("api_key").and_then(|v| v.as_str()).map_or(true, |s| s.is_empty()) {
         return Ok(None);
     }
-    let llm = LLMHelper::new(&Value::Object(settings));
+    let llm = LLMHelper::new(&Value::Object(settings), &locale);
     llm.categorize(&text).await.map(Some).or_else(|_| Ok(None))
 }
 
 #[tauri::command]
 pub async fn llm_analyze_work(state: State<'_, AppState>, data: Value) -> Result<Option<String>, String> {
+    let locale = current_locale(&state);
     let settings = state.db.lock().get_settings_map().map_err(|e| e.to_string())?;
     if settings.get("api_key").and_then(|v| v.as_str()).map_or(true, |s| s.is_empty()) {
         return Ok(None);
     }
-    let llm = LLMHelper::new(&Value::Object(settings));
+    let llm = LLMHelper::new(&Value::Object(settings), &locale);
     llm.analyze_work(&data).await.map(Some).or_else(|_| Ok(None))
 }
 
@@ -430,7 +434,7 @@ pub async fn llm_test(state: State<'_, AppState>, settings: Value) -> Result<Val
     if settings["api_key"].as_str().map_or(true, |s| s.is_empty()) {
         return Ok(json!({ "success": false, "error": t(&locale, "missing_api_key") }));
     }
-    let llm = LLMHelper::new(&settings);
+    let llm = LLMHelper::new(&settings, &locale);
     match llm.test().await {
         Ok(msg) => Ok(json!({ "success": true, "message": msg })),
         Err(e) => Ok(json!({ "success": false, "error": e })),
