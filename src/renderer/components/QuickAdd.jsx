@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../api';
+import { useI18n } from '../i18n';
 
 export default function QuickAdd() {
+  const { t } = useI18n();
   const [text, setText] = useState('');
   const inputRef = useRef(null);
 
@@ -47,7 +49,7 @@ export default function QuickAdd() {
         <div className="flex items-center gap-2 bg-white rounded-xl shadow-lg border border-gray-200 px-4 py-2.5 relative">
           <button onClick={doClose}
             className="absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded-full bg-white hover:bg-red-50 text-gray-300 hover:text-red-500 shadow border border-gray-200 transition-all"
-            title="关闭 (Esc)"
+            title={t('quickAdd.closeTooltip')}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -59,12 +61,12 @@ export default function QuickAdd() {
           <input ref={inputRef} type="text" value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit(); } }}
-            placeholder="快速添加待办，回车保存，Esc 关闭"
+            placeholder={t('quickAdd.placeholder')}
             className="flex-1 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400"
           />
           {text && (
             <button onClick={() => { setText(''); inputRef.current?.focus(); }}
-              className="text-gray-400 hover:text-gray-600 transition-colors shrink-0" title="清除"
+              className="text-gray-400 hover:text-gray-600 transition-colors shrink-0" title={t('quickAdd.clearTooltip')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
