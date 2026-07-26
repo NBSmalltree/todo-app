@@ -359,18 +359,29 @@ export default function Settings() {
 
               {/* Language Select */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
                   {t('settings.language.label')}
                 </label>
-                <select
-                  value={locale}
-                  onChange={(e) => setLocale(e.target.value)}
-                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all"
-                >
-                  {Object.entries(supportedLocales).map(([code, label]) => (
-                    <option key={code} value={code}>{label}</option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  {Object.entries(supportedLocales).map(([code, label]) => {
+                    const active = locale === code;
+                    return (
+                      <button
+                        key={code}
+                        onClick={() => setLocale(code)}
+                        className={`
+                          flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border transition-all
+                          ${active
+                            ? 'bg-sky-50 border-sky-300 text-sky-700 ring-1 ring-sky-200'
+                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-white'
+                          }
+                        `}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
                 <p className="text-xs text-gray-400 mt-1">{t('settings.language.hint')}</p>
               </div>
             </div>
