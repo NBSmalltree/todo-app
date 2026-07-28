@@ -1,6 +1,6 @@
 [package]
 name = "todo-float"
-version = "2.0.15"
+version = "2.1.0"
 description = "A lightweight floating desktop todo list"
 authors = ["TodoFloat"]
 edition = "2021"
