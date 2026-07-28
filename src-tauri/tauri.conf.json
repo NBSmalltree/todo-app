@@ -18,7 +18,7 @@
         "title": "TodoFloat",
         "width": 380,
         "height": 500,
-        "resizable": true,
+        "resizable": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
