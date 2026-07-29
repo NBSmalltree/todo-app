@@ -1,0 +1,59 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "float",
+        "title": "TodoFloat",
+        "width": 380,
+        "height": 500,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visibleOnAllWorkspaces": true,
+        "center": false,
+        "url": "/"
+      },
+      {
+        "label": "tray-view",
+        "title": "TodoFloat - 历史归档",
+        "width": 900,
+        "height": 700,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "visible": false,
+        "url": "/#/tray"
+      },
+      {
+        "label": "settings",
+        "title": "TodoFloat - 设置",
+        "width": 500,
+        "height": 600,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "visible": false,
+        "url": "/#/settings"
+      },
+      {
+        "label": "quickadd",
+        "title": "Quick Add",
+        "width": 440,
+        "height": 80,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false,
+        "url": "/#/quickadd"
+      }
+    ]
+  }
+}
