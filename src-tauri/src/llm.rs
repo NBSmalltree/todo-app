@@ -347,6 +347,46 @@ fn analysis_failed(locale: &str, error: &str) -> String {
     }
 }
 
+/// True if the base URL's last path segment looks like an API version
+/// (`/v1`, `/v2`, `/v4`, …), in which case we should not insert another `/v1`.
+fn has_version_segment(base: &str) -> bool {
+    base.rsplit('/')
+        .next()
+        .map(|seg| {
+            let rest = seg.strip_prefix('v').unwrap_or(seg);
+            !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
+        })
+        .unwrap_or(false)
+}
+
+/// Build the final HTTP endpoint from a user-provided base URL.
+///
+/// The base URL may already include a version segment (`/v1`, `/v4`) or even
+/// the full endpoint path. Normalize it for each format:
+/// - OpenAI    → `{base}/v1/chat/completions` (reuses an existing version segment)
+/// - Anthropic → `{base}/v1/messages`
+fn build_endpoint(base_url: &str, api_format: &str) -> String {
+    let base = base_url.trim_end_matches('/');
+
+    if api_format == "anthropic" {
+        if base.ends_with("/messages") {
+            return base.to_string();
+        }
+        if base.ends_with("/v1") {
+            return format!("{}/messages", base);
+        }
+        return format!("{}/v1/messages", base);
+    }
+
+    if base.ends_with("/chat/completions") {
+        return base.to_string();
+    }
+    if has_version_segment(base) {
+        return format!("{}/chat/completions", base);
+    }
+    format!("{}/v1/chat/completions", base)
+}
+
 impl LLMHelper {
     pub fn new(settings: &Value, locale: &str) -> Self {
         let api_format = settings["api_format"].as_str().unwrap_or("openai").to_string();
@@ -388,7 +428,7 @@ impl LLMHelper {
         };
 
         let resp = self.client
-            .post(format!("{}/chat/completions", self.base_url.trim_end_matches('/')))
+            .post(build_endpoint(&self.base_url, &self.api_format))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .json(&req)
             .send()
@@ -423,7 +463,7 @@ impl LLMHelper {
         };
 
         let resp = self.client
-            .post(format!("{}/v1/messages", self.base_url.trim_end_matches('/')))
+            .post(build_endpoint(&self.base_url, &self.api_format))
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
             .json(&req)
