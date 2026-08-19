@@ -353,6 +353,15 @@ pub fn run() {
                 }
             }
 
+            // Cold-start safety net: Tauri creates config windows *before* this
+            // setup hook runs, so the float window's initial get_active_todos
+            // invoke may have failed before AppState / the IPC bridge was
+            // ready. Emit data-changed now that everything is initialized —
+            // the frontend already listens for this and re-fetches.
+            let _ = app
+                .handle()
+                .emit_to("float", "data-changed", serde_json::json!({}));
+
             Ok(())
         })
         .on_window_event(|window, event| {

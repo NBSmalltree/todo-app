@@ -62,9 +62,24 @@ export default function TodoWindow() {
     document.documentElement.style.setProperty('--app-font-family', fontFamilyValue);
   };
 
-  // Load todos on mount
+  // Load todos on mount.
+  // Cold-start race: Tauri creates config windows before the backend setup
+  // finishes, and on Windows/WebView2 `window.__TAURI_INTERNALS__` may not be
+  // injected yet when this effect runs — the first invoke() then throws
+  // synchronously. Without a retry the list would stay empty until the next
+  // user-triggered refresh, so retry with backoff until the first success.
   useEffect(() => {
-    loadTodos();
+    let cancelled = false;
+    const tryLoad = async (attempt) => {
+      const ok = await loadTodos();
+      if (cancelled) return;
+      if (!ok && attempt < 9) {
+        setTimeout(() => tryLoad(attempt + 1), 200 * (attempt + 1));
+      }
+    };
+    tryLoad(0);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load and apply theme & opacity on mount, listen for changes
@@ -174,10 +189,12 @@ export default function TodoWindow() {
     // Load active todos and future todos independently so a failure in one
     // doesn't block the other (especially important on first mount when the
     // Tauri IPC bridge may not be fully ready on Windows).
+    let activeOk = false;
     try {
       const data = await api.getActiveTodos();
       setTodos(data);
       todosRef.current = data;
+      activeOk = true;
     } catch (error) {
       console.error('Failed to load active todos:', error);
     }
@@ -187,6 +204,8 @@ export default function TodoWindow() {
     } catch (error) {
       console.error('Failed to load future todos:', error);
     }
+    // Report whether the main list loaded — the mount effect retries on false.
+    return activeOk;
   };
 
   const handleAddTodo = async () => {
