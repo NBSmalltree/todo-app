@@ -35,6 +35,8 @@ export default function TodoWindow() {
   const [expandedSubtaskIds, setExpandedSubtaskIds] = useState(new Set());
   const [subtaskData, setSubtaskData] = useState({});   // todoId → subtask[]
   const [newSubtaskText, setNewSubtaskText] = useState({}); // todoId → text
+  const [subtaskEditingId, setSubtaskEditingId] = useState(null);   // subtask being edited
+  const [subtaskEditText, setSubtaskEditText] = useState('');       // edit text
   // Future scheduled tasks
   const [futureTodos, setFutureTodos] = useState([]);
   const todosRef = useRef([]); // ref for polling loop to check without stale closure
@@ -487,6 +489,45 @@ export default function TodoWindow() {
     if (e.key === 'Enter' && !isComposingRef.current) {
       e.preventDefault();
       handleAddSubtask(todoId);
+    }
+  };
+
+  // Subtask inline edit
+  const handleSubtaskDoubleClick = (e, sub) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setSubtaskEditingId(sub.id);
+    setSubtaskEditText(sub.text);
+  };
+
+  const handleSubtaskSaveEdit = async (todoId) => {
+    const trimmed = subtaskEditText.trim();
+    if (!trimmed) {
+      handleSubtaskCancelEdit();
+      return;
+    }
+    try {
+      await api.updateSubtaskText(subtaskEditingId, trimmed);
+      setSubtaskEditingId(null);
+      setSubtaskEditText('');
+      await loadSubtasks(todoId);
+    } catch (error) {
+      console.error('Failed to update subtask:', error);
+    }
+  };
+
+  const handleSubtaskCancelEdit = () => {
+    setSubtaskEditingId(null);
+    setSubtaskEditText('');
+  };
+
+  const handleSubtaskEditKeyDown = (e, todoId) => {
+    if (e.key === 'Enter' && !isComposingRef.current) {
+      e.preventDefault();
+      handleSubtaskSaveEdit(todoId);
+    }
+    if (e.key === 'Escape') {
+      handleSubtaskCancelEdit();
     }
   };
 
@@ -1153,17 +1194,34 @@ export default function TodoWindow() {
                         </svg>
                       ) : null}
                     </button>
-                    <span className={`flex-1 text-[11px] truncate ${sub.completed ? 'text-gray-400 line-through' : 'text-gray-600'}`}>
-                      {sub.text}
-                    </span>
-                    <button
-                      onClick={() => handleDeleteSubtask(sub.id, todo.id)}
-                      className="flex-shrink-0 opacity-0 group-hover/sub:opacity-100 w-4 h-4 flex items-center justify-center rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
-                    >
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M18 6L6 18M6 6l12 12" />
-                      </svg>
-                    </button>
+                    {subtaskEditingId === sub.id ? (
+                      <input
+                        type="text"
+                        value={subtaskEditText}
+                        onChange={(e) => setSubtaskEditText(e.target.value)}
+                        onKeyDown={(e) => handleSubtaskEditKeyDown(e, todo.id)}
+                        onBlur={() => handleSubtaskSaveEdit(todo.id)}
+                        autoFocus
+                        className="flex-1 min-w-0 text-[11px] bg-transparent border-b border-sky-300 outline-none text-gray-600"
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={(e) => handleSubtaskDoubleClick(e, sub)}
+                        className={`flex-1 text-[11px] truncate cursor-text ${sub.completed ? 'text-gray-400 line-through' : 'text-gray-600'}`}
+                      >
+                        {sub.text}
+                      </span>
+                    )}
+                    {subtaskEditingId !== sub.id && (
+                      <button
+                        onClick={() => handleDeleteSubtask(sub.id, todo.id)}
+                        className="flex-shrink-0 opacity-0 group-hover/sub:opacity-100 w-4 h-4 flex items-center justify-center rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
+                      >
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M18 6L6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 ))}
                 {/* Add subtask input */}
@@ -1174,6 +1232,7 @@ export default function TodoWindow() {
                     value={newSubtaskText[todo.id] || ''}
                     onChange={(e) => setNewSubtaskText((prev) => ({ ...prev, [todo.id]: e.target.value }))}
                     onKeyDown={(e) => handleSubtaskKeyDown(e, todo.id)}
+                    onBlur={() => handleAddSubtask(todo.id)}
                     placeholder={t('todo.subtasks.placeholder')}
                     className="flex-1 min-w-0 text-[11px] bg-transparent border-none outline-none placeholder-gray-300 text-gray-600"
                   />
