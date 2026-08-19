@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import DueDatePicker from './DueDatePicker';
 import PomodoroPanel from './PomodoroPanel';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { PhysicalSize, PhysicalPosition } from '@tauri-apps/api/dpi';
 
 import api from '../api';
 import { useI18n } from '../i18n';
@@ -515,8 +516,9 @@ export default function TodoWindow() {
     api.openTrayWindow();
   };
 
-  // Corner resize handlers — resize window directly like native border drag
-  const handleResizeStart = useCallback(async (e, corner) => {
+  // Border/corner resize handlers — resize window directly like native border drag.
+  // `direction` is one of: n, s, e, w, ne, nw, se, sw.
+  const handleResizeStart = useCallback(async (e, direction) => {
     e.preventDefault();
     e.stopPropagation();
     try {
@@ -527,7 +529,7 @@ export default function TodoWindow() {
       setResizeStart({
         x: e.clientX,
         y: e.clientY,
-        corner,
+        direction,
         width: startSize.width,
         height: startSize.height,
         posX: startPos.x,
@@ -548,11 +550,37 @@ export default function TodoWindow() {
       const minWidth = 200;
       const minHeight = 150;
 
-      const { corner, width, height, posX, posY } = resizeStart;
+      const { direction, width, height, posX, posY } = resizeStart;
 
       let newWidth, newHeight, newX, newY;
 
-      switch (corner) {
+      switch (direction) {
+        // Edges — only one dimension changes
+        case 'e':
+          newWidth = Math.max(minWidth, width + dx);
+          newHeight = height;
+          newX = posX;
+          newY = posY;
+          break;
+        case 'w':
+          newWidth = Math.max(minWidth, width - dx);
+          newHeight = height;
+          newX = posX + width - newWidth;
+          newY = posY;
+          break;
+        case 's':
+          newWidth = width;
+          newHeight = Math.max(minHeight, height + dy);
+          newX = posX;
+          newY = posY;
+          break;
+        case 'n':
+          newWidth = width;
+          newHeight = Math.max(minHeight, height - dy);
+          newX = posX;
+          newY = posY + height - newHeight;
+          break;
+        // Corners
         case 'se':
           newWidth = Math.max(minWidth, width + dx);
           newHeight = Math.max(minHeight, height + dy);
@@ -582,8 +610,8 @@ export default function TodoWindow() {
 
       const win = getCurrentWindow();
       Promise.all([
-        win.setSize({ width: newWidth, height: newHeight }),
-        win.setPosition({ x: newX, y: newY }),
+        win.setSize(new PhysicalSize(newWidth, newHeight)),
+        win.setPosition(new PhysicalPosition(newX, newY)),
       ]).catch(() => {});
     };
 
@@ -1416,7 +1444,23 @@ export default function TodoWindow() {
         </div>
       )}
 
-      {/* Resize handles for four corners */}
+      {/* Resize handles: four edges + four corners */}
+      <div
+        className="absolute top-0 left-2 right-2 h-1 cursor-n-resize z-40"
+        onMouseDown={(e) => handleResizeStart(e, 'n')}
+      />
+      <div
+        className="absolute bottom-0 left-2 right-2 h-1 cursor-s-resize z-40"
+        onMouseDown={(e) => handleResizeStart(e, 's')}
+      />
+      <div
+        className="absolute left-0 top-2 bottom-2 w-1 cursor-w-resize z-40"
+        onMouseDown={(e) => handleResizeStart(e, 'w')}
+      />
+      <div
+        className="absolute right-0 top-2 bottom-2 w-1 cursor-e-resize z-40"
+        onMouseDown={(e) => handleResizeStart(e, 'e')}
+      />
       <div
         className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-40"
         onMouseDown={(e) => handleResizeStart(e, 'nw')}

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { PhysicalSize, PhysicalPosition } from '@tauri-apps/api/dpi';
 
 /**
  * Four corner drag-handles that resize the current Tauri window programmatically.
@@ -74,8 +75,8 @@ export default function WindowResizeHandles({ minWidth = 200, minHeight = 150 })
 
       const win = getCurrentWindow();
       Promise.all([
-        win.setSize({ width: newWidth, height: newHeight }),
-        win.setPosition({ x: newX, y: newY }),
+        win.setSize(new PhysicalSize(newWidth, newHeight)),
+        win.setPosition(new PhysicalPosition(newX, newY)),
       ]).catch(() => {});
     };
 
