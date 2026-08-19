@@ -645,6 +645,16 @@ input, textarea {
   background: #ffffff;
 }
 
+/* QuickAdd #root follows the theme so the window frame doesn't stay white
+   in dark / eye-care mode. Colors match the themed `.bg-white` input bar. */
+[data-window="quickadd"][data-theme="dark"] #root {
+  background: #1e1e2e;
+}
+
+[data-window="quickadd"][data-theme="eye-care"] #root {
+  background: #f5f0e8;
+}
+
 [data-window="quickadd"] body {
   background: transparent;
 }
